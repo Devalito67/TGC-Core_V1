@@ -27,6 +27,16 @@
         "projectId": "4cb33218-e416-4519-bb0c-21f75a2fcd25"
       }
     },
-    "owner": "devalito"
+    "owner": "devalito",
+    "plugins": [
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": true,
+          "style": "light",
+          "enforceContrast": false
+        }
+      ]
+    ]
   }
 }
