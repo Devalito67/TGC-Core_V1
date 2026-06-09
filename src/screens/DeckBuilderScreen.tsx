@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Modal,
+  Dimensions,
+  TouchableWithoutFeedback,
   FlatList,
 } from 'react-native';
 import { useDeckStore } from '../stores';
@@ -26,20 +29,19 @@ export const DeckBuilderScreen: React.FC = () => {
   const removeCardFromDeck = useDeckStore((s) => s.removeCardFromDeck);
   const saveDeck = useDeckStore((s) => s.saveDeck);
   const clearCurrentDeck = useDeckStore((s) => s.clearCurrentDeck);
+  const screenHeight = Dimensions.get('window').height;
+  // ratio poker standard : 63mm x 88mm = 1:1.3968
+  const CARD_HEIGHT = screenHeight * 0.85;
+  const CARD_WIDTH = CARD_HEIGHT / 1.397;
 
   const [search, setSearch] = useState('');
   const [deckName, setDeckName] = useState('Deck List');
   const [isEditingDeckName, setIsEditingDeckName] = useState(false);
   const [curveCollapsed, setCurveCollapsed] = useState(false);
-
-  const [expandedCardName, setExpandedCardName] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<typeof defaultCards[0] | null>(null);
 
   const getCountForCard = (cardName: string) => {
     return groupedDeck.find((c) => c.name === cardName)?.count || 0;
-  };
-
-  const toggleExpandedCard = (cardName: string) => {
-    setExpandedCardName((prev) => (prev === cardName ? null : cardName));
   };
 
   useEffect(() => {
@@ -261,6 +263,29 @@ export const DeckBuilderScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <Modal
+        visible={selectedCard !== null}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSelectedCard(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setSelectedCard(null)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalCardWrapper, { width: CARD_WIDTH, height: CARD_HEIGHT }]}>
+                {selectedCard && (
+                  <CardComponent
+                    card={selectedCard}
+                    width={CARD_WIDTH}
+                    height={CARD_HEIGHT}
+                  />
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconButton}>
           <Text style={styles.iconText}>☰</Text>
@@ -297,7 +322,6 @@ export const DeckBuilderScreen: React.FC = () => {
             removeClippedSubviews={false}
             ListHeaderComponent={renderLeftHeader}
             renderItem={({ item }) => {
-              const isExpanded = expandedCardName === item.name;
               const isMaxCopies = item.count >= 4;
 
               return (
@@ -307,13 +331,15 @@ export const DeckBuilderScreen: React.FC = () => {
 
                     <TouchableOpacity
                       style={styles.colNameTouchable}
-                      onPress={() => toggleExpandedCard(item.name)}
+                      onPress={() => {
+                        if (item.templateCard) setSelectedCard(item.templateCard);
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text numberOfLines={1} style={styles.colNameValue}>
                         {item.name}
                       </Text>
-                      <Text style={styles.expandHint}>{isExpanded ? '▲' : '▼'}</Text>
+                      <Text style={styles.expandHint}>👁</Text>
                     </TouchableOpacity>
 
                     <View style={styles.qtyBox}>
@@ -340,12 +366,6 @@ export const DeckBuilderScreen: React.FC = () => {
                       </TouchableOpacity>
                     </View>
                   </View>
-
-                  {isExpanded && item.templateCard && (
-                    <View style={styles.expandedCardContainer}>
-                      <CardComponent card={item.templateCard} size="normal" />
-                    </View>
-                  )}
                 </View>
               );
             }}
@@ -727,5 +747,19 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 14,
     marginTop: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCardWrapper: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.12)',
+    position: 'relative',
+    backgroundColor: '#0B1220',
   },
 });

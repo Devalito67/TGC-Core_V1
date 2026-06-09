@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card } from '../types';
 
 interface CardComponentProps {
@@ -7,13 +7,17 @@ interface CardComponentProps {
   onPress?: () => void;
   playable?: boolean;
   size?: 'small' | 'normal' | 'large';
+  width?: number;
+  height?: number;
 }
 
-export const CardComponent: React.FC<CardComponentProps> = ({ 
-  card, 
-  onPress, 
+export const CardComponent: React.FC<CardComponentProps> = ({
+  card,
+  onPress,
   playable = false,
-  size = 'normal' 
+  size = 'normal',
+  width,
+  height,
 }) => {
   const getSize = () => {
     switch (size) {
@@ -23,7 +27,14 @@ export const CardComponent: React.FC<CardComponentProps> = ({
     }
   };
 
-  const dims = getSize();
+  const baseDims = getSize();
+  const finalWidth = width ?? baseDims.width;
+  const finalHeight = height ?? baseDims.height;
+
+  // Scale la font selon la hauteur réelle vs hauteur de base
+  const scale = finalHeight / baseDims.height;
+  const fontSize = Math.round(baseDims.fontSize * scale);
+  const statFontSize = Math.round(14 * scale);
 
   const getElementColor = () => {
     const colors = {
@@ -48,30 +59,38 @@ export const CardComponent: React.FC<CardComponentProps> = ({
   };
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={onPress}
       disabled={!playable}
       style={[
         styles.card,
-        { 
-          width: dims.width, 
-          height: dims.height,
+        {
+          width: finalWidth,
+          height: finalHeight,
           borderColor: getRarityBorder(),
           backgroundColor: getElementColor(),
+          borderRadius: Math.round(10 * scale),
+          padding: Math.round(8 * scale),
         },
         playable && styles.playable,
       ]}
     >
-      <Text style={[styles.cardName, { fontSize: dims.fontSize }]}>
-        {card.name}
-      </Text>
+      <Text style={[styles.cardName, { fontSize }]}>{card.name}</Text>
+
       <View style={styles.stats}>
-        <Text style={styles.stat}>{card.cost}</Text>
-        <Text style={styles.stat}>⚔️{card.attack}</Text>
-        <Text style={styles.stat}>❤️{card.health}</Text>
+        <Text style={[styles.stat, { fontSize: statFontSize }]}>{card.cost}</Text>
+        <Text style={[styles.stat, { fontSize: statFontSize }]}>⚔️{card.attack}</Text>
+        <Text style={[styles.stat, { fontSize: statFontSize }]}>❤️{card.health}</Text>
       </View>
+
+      {card.description ? (
+        <Text style={[styles.description, { fontSize: Math.round(11 * scale) }]} numberOfLines={3}>
+          {card.description}
+        </Text>
+      ) : null}
+
       {card.type === 'spell' && (
-        <Text style={styles.spellBadge}>SORT</Text>
+        <Text style={[styles.spellBadge, { fontSize: Math.round(10 * scale) }]}>SORT</Text>
       )}
     </TouchableOpacity>
   );
@@ -79,9 +98,7 @@ export const CardComponent: React.FC<CardComponentProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 10,
     borderWidth: 3,
-    padding: 8,
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -108,7 +125,14 @@ const styles = StyleSheet.create({
   stat: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 14,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  description: {
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    fontStyle: 'italic',
     textShadowColor: '#000',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -122,7 +146,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
-    fontSize: 10,
     fontWeight: 'bold',
   },
 });
