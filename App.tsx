@@ -78,23 +78,7 @@ export default function App() {
         {renderScreen()}
       </View>
 
-      {activeScreen !== 'game' && (
-        <View style={styles.navBar}>
-          <TouchableOpacity
-            onPress={() => setActiveScreen('menu')}
-            style={[styles.navButton, activeScreen === 'menu' && styles.navButtonActive]}
-          >
-            <Text style={styles.navButtonText}>🏠 Menu</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setActiveScreen('deck')}
-            style={[styles.navButton, activeScreen === 'deck' && styles.navButtonActive]}
-          >
-            <Text style={styles.navButtonText}>🃏 Deck</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      
     </SafeAreaView>
   );
 }
