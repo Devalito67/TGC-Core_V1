@@ -29,6 +29,11 @@ export const DeckBuilderScreen: React.FC = () => {
   const removeCardFromDeck = useDeckStore((s) => s.removeCardFromDeck);
   const saveDeck = useDeckStore((s) => s.saveDeck);
   const clearCurrentDeck = useDeckStore((s) => s.clearCurrentDeck);
+  const screenWidth = Dimensions.get('window').width;
+  // Panneau droit = flex:1, le gauche = 40% + gap 12 + padding 16*2
+  const rightPanelWidth = screenWidth * 0.6 - 12 - 20; // approx
+  const cardTileWidth = (rightPanelWidth - 10 * 3) / 2; // padding 10 + gap entre 2 colonnes
+  const cardTileHeight = cardTileWidth * 1.397; // ratio poker
   const screenHeight = Dimensions.get('window').height;
   // ratio poker standard : 63mm x 88mm = 1:1.3968
   const CARD_HEIGHT = screenHeight * 0.85;
@@ -390,12 +395,20 @@ export const DeckBuilderScreen: React.FC = () => {
 
               return (
                 <TouchableOpacity
-                  style={[styles.cardTile, isMaxCopies && styles.cardTileDisabled]}
+                  style={[
+                    styles.cardTile,
+                    { width: cardTileWidth, height: cardTileHeight },
+                    isMaxCopies && styles.cardTileDisabled,
+                  ]}
                   onPress={() => handleAddCard(item)}
                   activeOpacity={0.9}
                   disabled={isMaxCopies || isDeckFull}
                 >
-                  <CardComponent card={item} size="normal" />
+                  <CardComponent
+                    card={item}
+                    width={cardTileWidth}
+                    height={cardTileHeight}
+                  />
 
                   <View style={styles.cardOverlay}>
                     <Text style={styles.cardOverlayText}>
@@ -717,11 +730,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardTile: {
-    width: '48.5%',
-    backgroundColor: '#0B1220',
-    borderRadius: 16,
-    padding: 8,
-    position: 'relative',
+  backgroundColor: '#0B1220',
+  borderRadius: 16,
+  position: 'relative',
+  overflow: 'hidden', // 👈 ajoute ça pour que la carte ne déborde pas
   },
   cardTileDisabled: {
     opacity: 0.55,
