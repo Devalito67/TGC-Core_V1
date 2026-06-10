@@ -50,7 +50,7 @@ const initialState: GameState = {
   players: [emptyPlayer, emptyPlayer],
   currentPlayerIndex: 0,
   turn: 1,
-  gamePhase: 'menu' as const,
+  gamePhase: 'home' as const,
   winner: null,
   logs: [],
 };

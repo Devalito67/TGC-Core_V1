@@ -9,12 +9,13 @@ import {
 } from 'react-native';
 import { useGameStore } from '../stores';
 import { useDeckStore, DECK_MIN_SIZE, SavedDeck } from '../stores/deckStore';
+import BurgerMenu from '../components/BurgerMenu';
 
-interface MenuScreenProps {
+interface HomeScreenProps {
   onGoToDeck?: () => void;
 }
 
-export const MenuScreen: React.FC<MenuScreenProps> = ({ onGoToDeck }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
   const initializeGame = useGameStore((state) => state.initializeGame);
   const createDefaultDeck = useDeckStore((state) => state.createDefaultDeck);
   const currentDeck = useDeckStore((state) => state.currentDeck);
@@ -74,6 +75,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onGoToDeck }) => {
 
   const renderHeader = () => (
     <View>
+       <BurgerMenu items={[
+          { label: 'Deck Builder', icon: '🃏', onPress: () => onGoToDeck?.() },
+        ]} />
       <Text style={styles.title}>⚔️ TCG Template</Text>
       <Text style={styles.subtitle}>Jeu de Cartes Personnalisable</Text>
 
@@ -128,7 +132,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({ onGoToDeck }) => {
 
       {onGoToDeck && (
         <TouchableOpacity onPress={onGoToDeck} style={styles.buttonTertiary}>
-          <Text style={styles.buttonText}>🃏 Ouvrir Deck Builder</Text>
+          <Text style={styles.buttonText}>🃏 Ouvrir </Text>
         </TouchableOpacity>
       )}
 

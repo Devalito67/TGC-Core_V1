@@ -2,26 +2,26 @@ import { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { MenuScreen, GameScreen, DeckBuilderScreen } from './src/screens';
+import { GameScreen, DeckBuilderScreen, HomeScreen } from './src/screens';
 import { useGameStore } from './src/stores';
 import { NavigationBar } from 'expo-navigation-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 
-type ActiveScreen = 'menu' | 'game' | 'deck';
+type ActiveScreen = 'home' | 'game' | 'deck';
 
 export default function App() {
   const gamePhase = useGameStore((s) => s.state.gamePhase);
   const resetGame = useGameStore((s) => s.resetGame);
-  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('menu');
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('home');
   const [isLandscape, setIsLandscape] = useState(false);
 
   useEffect(() => {
     if (gamePhase === 'playing') {
       setActiveScreen('game');
     }
-    if (gamePhase === 'menu') {
-      setActiveScreen('menu');
+    if (gamePhase === 'home') {
+      setActiveScreen('home');
     }
   }, [gamePhase]);
 
@@ -57,17 +57,17 @@ export default function App() {
 
   const handleReset = () => {
     resetGame();
-    setActiveScreen('menu');
+    setActiveScreen('home');
   };
 
   const renderScreen = () => {
     switch (activeScreen) {
       case 'game':
-        return <GameScreen onBackToMenu={handleReset} />;
+        return <GameScreen onBackToHome={handleReset} />;
       case 'deck':
-        return <DeckBuilderScreen />;
+        return <DeckBuilderScreen onGoToHome={() => setActiveScreen('home')}/>;
       default:
-        return <MenuScreen onGoToDeck={() => setActiveScreen('deck')} />;
+        return <HomeScreen onGoToDeck={() => setActiveScreen('deck')} />;
     }
   };
 

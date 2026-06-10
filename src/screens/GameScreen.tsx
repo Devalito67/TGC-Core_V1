@@ -6,10 +6,10 @@ import { useGameStore } from '../stores';
 import { Hand, Board, GameLog, Controls, GameOverModal } from '../components';
 
 type GameScreenProps = {
-  onBackToMenu: () => void;
+  onBackToHome: () => void;
 };
 
-export const GameScreen: React.FC<GameScreenProps> = ({ onBackToMenu }) => {
+export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const state = useGameStore((s) => s.state);
   const drawCard = useGameStore((s) => s.drawCard);
   const endTurn = useGameStore((s) => s.endTurn);
@@ -42,8 +42,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToMenu }) => {
   const canDraw = currentPlayer.hand.length < 10;
   const canEndTurn = true;
 
-  if (state.gamePhase === 'menu') {
-    return <Text style={styles.empty}>Retour au menu</Text>;
+  if (state.gamePhase === 'home') {
+    return <Text style={styles.empty}>Retour à l'accueil</Text>;
   }
 
   return (

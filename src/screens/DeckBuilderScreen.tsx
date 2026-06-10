@@ -15,6 +15,11 @@ import { useDeckStore } from '../stores';
 import { CardComponent } from '../components';
 import { defaultCards } from '../data/defaultCards';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import BurgerMenu from '../components/BurgerMenu';
+
+interface DeckBuilderScreenProps {
+  onGoToHome?: () => void;
+}
 
 const generateId = (): string => {
   return (
@@ -23,7 +28,7 @@ const generateId = (): string => {
   );
 };
 
-export const DeckBuilderScreen: React.FC = () => {
+export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome}) => {
   const currentDeck = useDeckStore((s) => s.currentDeck);
   const addCardToDeck = useDeckStore((s) => s.addCardToDeck);
   const removeCardFromDeck = useDeckStore((s) => s.removeCardFromDeck);
@@ -292,9 +297,9 @@ export const DeckBuilderScreen: React.FC = () => {
         </TouchableWithoutFeedback>
       </Modal>
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconButton}>
-          <Text style={styles.iconText}>☰</Text>
-        </TouchableOpacity>
+        <BurgerMenu items={[
+          { label: 'Accueil', icon: '🏠', onPress: () => onGoToHome?.() },
+        ]} />
 
         <Text style={styles.tcgTitle}>Mon TCG</Text>
 

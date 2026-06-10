@@ -18,7 +18,7 @@ export interface GameState {
   players: [Player, Player];
   currentPlayerIndex: number;
   turn: number;
-  gamePhase: 'menu' | 'setup' | 'playing' | 'gameover';
+  gamePhase: 'home' | 'setup' | 'playing' | 'gameover';
   winner: Player | null;
   logs: string[];
 }

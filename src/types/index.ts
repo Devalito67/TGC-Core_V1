@@ -3,7 +3,7 @@ import { GameConfig } from '../config/gameConfig';
 export type Element = typeof GameConfig.ELEMENTS[number];
 export type CardType = 'minion' | 'spell' | 'weapon';
 export type Rarity   = 'common' | 'rare' | 'epic' | 'legendary';
-export type GamePhase = 'menu' | 'playing' | 'gameover';
+export type GamePhase = 'home' | 'playing' | 'gameover';
 
 export interface Card {
   id: string;
