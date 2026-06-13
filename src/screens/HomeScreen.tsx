@@ -7,15 +7,15 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useGameStore } from '../stores';
 import { useDeckStore, DECK_MIN_SIZE, SavedDeck } from '../stores/deckStore';
 import BurgerMenu from '../components/BurgerMenu';
+import type { RootStackParamList } from '../../App';
 
-interface HomeScreenProps {
-  onGoToDeck?: () => void;
-}
+type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const initializeGame = useGameStore((state) => state.initializeGame);
   const createDefaultDeck = useDeckStore((state) => state.createDefaultDeck);
   const currentDeck = useDeckStore((state) => state.currentDeck);
@@ -36,15 +36,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
       );
       return;
     }
+
     const deckCopy1 = currentDeck.map((c) => ({
       ...c,
       id: Math.random().toString(36).substring(2),
     }));
+
     const deckCopy2 = currentDeck.map((c) => ({
       ...c,
       id: Math.random().toString(36).substring(2),
     }));
+
     initializeGame(deckCopy1, deckCopy2, 'Joueur 1', 'Joueur 2');
+    navigation.navigate('Game');
   };
 
   const handleLoadDefault = () => {
@@ -54,12 +58,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
 
   const handleNewDeck = () => {
     clearCurrentDeck();
-    onGoToDeck?.();
+    navigation.navigate('DeckBuilder');
   };
 
   const handleOpenDeck = (deckId: string) => {
     openDeck(deckId);
-    onGoToDeck?.();
+    navigation.navigate('DeckBuilder');
   };
 
   const handleDeleteDeck = (deckId: string, name: string) => {
@@ -75,22 +79,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
 
   const renderHeader = () => (
     <View>
-       <BurgerMenu items={[
-          { label: 'Deck Builder', icon: '🃏', onPress: () => onGoToDeck?.() },
-        ]} />
+      <BurgerMenu
+        items={[
+          { label: 'Deck Builder', icon: '🃏', onPress: () => navigation.navigate('DeckBuilder') },
+        ]}
+      />
+
       <Text style={styles.title}>⚔️ TCG Template</Text>
       <Text style={styles.subtitle}>Jeu de Cartes Personnalisable</Text>
 
-      {/* Deck actif */}
       <View style={styles.currentDeckBox}>
         <Text style={styles.currentDeckLabel}>Deck chargé</Text>
         <Text style={styles.currentDeckName}>{currentDeckName}</Text>
         <Text style={styles.currentDeckMeta}>{deckCount} cartes</Text>
       </View>
 
-      {/* Mode de jeu */}
       <View style={styles.modeBox}>
         <Text style={styles.modeTitle}>🎮 Mode de jeu</Text>
+
         <View style={styles.modeItem}>
           <Text style={styles.modeIcon}>♟️</Text>
           <View>
@@ -98,6 +104,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
             <Text style={styles.modeDesc}>Joue les 2 côtés comme aux échecs</Text>
           </View>
         </View>
+
         <View style={[styles.modeItem, styles.modeLocked]}>
           <Text style={styles.modeIcon}>🌐</Text>
           <View>
@@ -105,6 +112,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
             <Text style={styles.modeDesc}>Prochainement (V2)</Text>
           </View>
         </View>
+
         <View style={[styles.modeItem, styles.modeLocked]}>
           <Text style={styles.modeIcon}>🤖</Text>
           <View>
@@ -114,7 +122,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
         </View>
       </View>
 
-      {/* En-tête liste decks */}
       <View style={styles.deckListHeader}>
         <Text style={styles.deckListTitle}>📚 Mes Decks sauvegardés</Text>
         <TouchableOpacity style={styles.newDeckButton} onPress={handleNewDeck}>
@@ -129,12 +136,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
       <TouchableOpacity onPress={handleLoadDefault} style={styles.buttonSecondary}>
         <Text style={styles.buttonText}>🃏 Charger Deck Par Défaut (40 cartes)</Text>
       </TouchableOpacity>
-
-      {onGoToDeck && (
-        <TouchableOpacity onPress={onGoToDeck} style={styles.buttonTertiary}>
-          <Text style={styles.buttonText}>🃏 Ouvrir </Text>
-        </TouchableOpacity>
-      )}
 
       <TouchableOpacity
         onPress={startGame}
@@ -170,12 +171,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onGoToDeck }) => {
             <Text style={styles.deckCardName}>{item.name}</Text>
             <Text style={styles.deckCardMeta}>{item.cards.length} cartes</Text>
           </View>
+
           <TouchableOpacity
             style={styles.openButton}
             onPress={() => handleOpenDeck(item.id)}
           >
             <Text style={styles.openButtonText}>Ouvrir</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => handleDeleteDeck(item.id, item.name)}

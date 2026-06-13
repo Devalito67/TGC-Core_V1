@@ -60,7 +60,7 @@ export const defaultCards: Card[] = [
   },
   {
     id: generateId(),
-    name: 'Soin Magical',
+    name: 'Soin Magique',
     description: 'Restaure 5 points de vie',
     cost: 2,
     attack: 0,

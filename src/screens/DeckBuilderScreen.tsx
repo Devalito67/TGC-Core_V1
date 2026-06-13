@@ -14,26 +14,21 @@ import {
 import { useDeckStore } from '../stores';
 import { CardComponent } from '../components';
 import { defaultCards } from '../data/defaultCards';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import BurgerMenu from '../components/BurgerMenu';
+import type { RootStackParamList } from '../../App';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { lockLandscape, unlockOrientation } from '../utils/lockLandcape';
+import { generateId } from '../utils/generateId';
 
-interface DeckBuilderScreenProps {
-  onGoToHome?: () => void;
-}
+type DeckBuilderScreenProps = NativeStackScreenProps<RootStackParamList, 'DeckBuilder'>;
 
-const generateId = (): string => {
-  return (
-    Math.random().toString(36).substring(2, 15) +
-    Math.random().toString(36).substring(2, 15)
-  );
-};
-
-export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome}) => {
+export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ navigation, route }) => {
   const currentDeck = useDeckStore((s) => s.currentDeck);
   const addCardToDeck = useDeckStore((s) => s.addCardToDeck);
   const removeCardFromDeck = useDeckStore((s) => s.removeCardFromDeck);
   const saveDeck = useDeckStore((s) => s.saveDeck);
   const clearCurrentDeck = useDeckStore((s) => s.clearCurrentDeck);
+  const currentDeckName = useDeckStore((s) => s.currentDeckName);
   const screenWidth = Dimensions.get('window').width;
   // Panneau droit = flex:1, le gauche = 40% + gap 12 + padding 16*2
   const rightPanelWidth = screenWidth * 0.6 - 12 - 20; // approx
@@ -45,7 +40,7 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome
   const CARD_WIDTH = CARD_HEIGHT / 1.397;
 
   const [search, setSearch] = useState('');
-  const [deckName, setDeckName] = useState('Deck List');
+  const [deckName, setDeckName] = useState(currentDeckName || 'Deck List');
   const [isEditingDeckName, setIsEditingDeckName] = useState(false);
   const [curveCollapsed, setCurveCollapsed] = useState(false);
   const [selectedCard, setSelectedCard] = useState<typeof defaultCards[0] | null>(null);
@@ -55,22 +50,15 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome
   };
 
   useEffect(() => {
-    const lockLandscape = async () => {
-      try {
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE
-        );
-      } catch (error) {
-        console.log('Orientation lock error:', error);
-      }
-    };
-
     lockLandscape();
-
     return () => {
-      ScreenOrientation.unlockAsync().catch(() => { });
+      unlockOrientation();
     };
   }, []);
+
+  useEffect(() => {
+    setDeckName(currentDeckName || 'Deck List');
+  }, [currentDeckName]);
 
   const handleAddCard = (templateCard: typeof defaultCards[0]) => {
     if ((currentDeck?.length || 0) >= 40) {
@@ -298,7 +286,7 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome
       </Modal>
       <View style={styles.topBar}>
         <BurgerMenu items={[
-          { label: 'Accueil', icon: '🏠', onPress: () => onGoToHome?.() },
+          { label: 'Accueil', icon: '🏠', onPress: () => navigation.navigate('Home') },
         ]} />
 
         <Text style={styles.tcgTitle}>Mon TCG</Text>
@@ -311,7 +299,7 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ onGoToHome
           style={styles.searchInput}
         />
 
-        <TouchableOpacity style={styles.secondaryButton}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.goBack()}>
           <Text style={styles.secondaryButtonText}>Annuler</Text>
         </TouchableOpacity>
 
@@ -673,14 +661,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  expandedCardContainer: {
-    backgroundColor: '#0B1220',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    paddingHorizontal: 8,
-    paddingBottom: 10,
-    marginTop: -4,
-  },
   qtyButtonDisabled: {
     backgroundColor: '#3F3F46',
     opacity: 0.5,
@@ -735,10 +715,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardTile: {
-  backgroundColor: '#0B1220',
-  borderRadius: 16,
-  position: 'relative',
-  overflow: 'hidden', // 👈 ajoute ça pour que la carte ne déborde pas
+    backgroundColor: '#0B1220',
+    borderRadius: 16,
+    position: 'relative',
+    overflow: 'hidden', // 👈 ajoute ça pour que la carte ne déborde pas
   },
   cardTileDisabled: {
     opacity: 0.55,

@@ -1,6 +1,6 @@
 import { Card, Player, GameState } from '../types';
 import { GameConfig } from '../config/gameConfig';
-import { spellEffects, spellNeedsTarget } from './spellEffects';
+import { spellEffects } from './spellEffects';
 
 export const baseRules = {
 

@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import * as ScreenOrientation from 'expo-screen-orientation';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameStore } from '../stores';
-import { Hand, Board, GameLog, Controls, GameOverModal } from '../components';
+import { Hand, Board, GameOverModal } from '../components';
+import { lockLandscape, unlockOrientation } from '../utils/lockLandcape';
 
 type GameScreenProps = {
   onBackToHome: () => void;
@@ -11,112 +11,103 @@ type GameScreenProps = {
 
 export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const state = useGameStore((s) => s.state);
-  const drawCard = useGameStore((s) => s.drawCard);
+
   const endTurn = useGameStore((s) => s.endTurn);
   const resetGame = useGameStore((s) => s.resetGame);
   const attackWithCard = useGameStore((s) => s.attackWithCard);
   const attackPlayer = useGameStore((s) => s.attackPlayer);
+  const turnPhase = state.turnPhase;
 
   useEffect(() => {
-    const lockLandscape = async () => {
-      try {
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE
-        );
-      } catch (error) {
-        console.log('Orientation lock error:', error);
-      }
-    };
-
     lockLandscape();
-
     return () => {
-      ScreenOrientation.unlockAsync().catch(() => {});
+      unlockOrientation();
     };
   }, []);
 
   const currentPlayer = state.players[state.currentPlayerIndex];
   const opponent = state.players[state.currentPlayerIndex === 0 ? 1 : 0];
-  const isCurrentPlayer = state.gamePhase === 'playing';
+  const isGameActive = state.gamePhase === 'playing';
 
-  const canDraw = currentPlayer.hand.length < 10;
-  const canEndTurn = true;
 
   if (state.gamePhase === 'home') {
-    return <Text style={styles.empty}>Retour à l'accueil</Text>;
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.emptyText}>Returning to Rift Sanctum...</Text>
+      </View>
+    );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Board
-        player={currentPlayer}
-        opponent={opponent}
-        isCurrentPlayer={isCurrentPlayer}
-        onAttackSelf={attackWithCard}
-        onAttackOpponent={attackPlayer}
-      />
+    <View style={styles.root}>
+      <StatusBar hidden />
 
-      <View style={styles.bottomPanel}>
-        <View style={styles.handContainer}>
-          <Text style={styles.handTitle}>🖐️ Ta main</Text>
-          <Hand cards={currentPlayer.hand} />
-        </View>
-
-        <View style={styles.sidePanel}>
-          <Controls
-            onDraw={drawCard}
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <View style={styles.boardWrapper}>
+          <Board
+            player={currentPlayer}
+            opponent={opponent}
+            isCurrentPlayer={isGameActive}
+            turnPhase={turnPhase}
+            onAttackSelf={attackWithCard}
+            onAttackOpponent={attackPlayer}
             onEndTurn={endTurn}
-            canDraw={canDraw}
-            canEndTurn={canEndTurn}
           />
-          <GameLog logs={state.logs} />
         </View>
-      </View>
 
-      <GameOverModal
-        visible={state.gamePhase === 'gameover'}
-        winner={state.winner}
-        onRestart={resetGame}
-      />
-    </SafeAreaView>
+        <View style={styles.overlayUi}>
+          <View style={styles.handWrapper}>
+            <Hand cards={currentPlayer.hand} />
+          </View>
+        </View>
+
+        <GameOverModal
+          visible={state.gamePhase === 'gameover' && state.winner !== null}
+          winner={state.winner}
+          onRestart={resetGame}
+        />
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0c0e11',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
-  empty: {
-    color: '#fff',
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 50,
-  },
-  bottomPanel: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 10,
-    paddingBottom: 6,
-  },
-  handContainer: {
-    flex: 2,
-    padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 10,
-  },
-  handTitle: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  sidePanel: {
+  centered: {
     flex: 1,
-    gap: 8,
-    justifyContent: 'flex-start',
+    backgroundColor: '#0c0e11',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#d4af37',
+    fontSize: 18,
+    fontFamily: 'Sora',
+    letterSpacing: 2,
+  },
+  boardWrapper: {
+    flex: 1,
+    zIndex: 1,
+  },
+  overlayUi: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    flexDirection: 'row',
+    pointerEvents: 'box-none',
+    zIndex: 10,
+  },
+  handWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    pointerEvents: 'box-none',
   },
 });

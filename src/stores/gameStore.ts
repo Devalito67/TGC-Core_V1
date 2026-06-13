@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { Card, GameState, Player } from '../types';
+import { Card, GameState, Player, TurnPhase } from '../types';
 import { baseRules } from '../rules';
 import { GameConfig } from '../config/gameConfig';
+import { generateId } from '../utils/generateId';
 
 interface GameStore {
   state: GameState;
@@ -13,10 +14,9 @@ interface GameStore {
   attackPlayer: (attackerId: string) => void;
   resetGame: () => void;
   playSpell: (card: Card, targetCardId?: string) => void;
+  setTurnPhase: (phase: TurnPhase) => void;
+  nextTurnPhase: () => void;
 }
-
-const generateId = (): string =>
-  Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 const createInitialPlayer = (deck: Card[], name: string): Player => ({
   id: generateId(),
@@ -51,6 +51,7 @@ const initialState: GameState = {
   currentPlayerIndex: 0,
   turn: 1,
   gamePhase: 'home' as const,
+  turnPhase: 'draw',
   winner: null,
   logs: [],
 };
@@ -67,6 +68,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentPlayerIndex: 0,
       turn: 1,
       gamePhase: 'playing' as const,
+      turnPhase: 'main1',
       winner: null,
       logs: ['⚔️ Que la bataille commence !'],
     };
@@ -90,6 +92,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   drawCard: () => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
+    if (state.turnPhase !== 'draw') return;
 
     const player = state.players[state.currentPlayerIndex];
     const newState = baseRules.onCardDraw(state, player);
@@ -98,13 +101,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : { ...newState, turnPhase: 'main1' }
     });
   },
 
   playCard: (card) => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
+    if (state.turnPhase !== 'main1' && state.turnPhase !== 'main2') return;
 
     const player = state.players[state.currentPlayerIndex];
     const newState = baseRules.onCardPlay(state, player, card);
@@ -127,13 +131,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : { ...newState, turnPhase: 'draw' }
     });
   },
 
   attackWithCard: (attackerId, defenderId) => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
+    if (state.turnPhase !== 'attack') return;
 
     const player = state.players[state.currentPlayerIndex];
     const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
@@ -180,6 +185,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   attackPlayer: (attackerId) => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
+    if (state.turnPhase !== 'attack') return;
 
     const player = state.players[state.currentPlayerIndex];
     const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
@@ -218,6 +224,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playSpell: (card, targetCardId?) => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
+    if (state.turnPhase !== 'main1' && state.turnPhase !== 'main2') return;
 
     const player = state.players[state.currentPlayerIndex];
     const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
@@ -234,6 +241,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
         : newState
+    });
+  },
+
+  setTurnPhase: (phase) => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing') return;
+
+    set({
+      state: {
+        ...state,
+        turnPhase: phase,
+      },
+    });
+  },
+
+  nextTurnPhase: () => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing') return;
+
+    const phaseOrder: TurnPhase[] = ['draw', 'main1', 'attack', 'defense', 'main2', 'end'];
+    const currentIndex = phaseOrder.indexOf(state.turnPhase);
+
+    if (currentIndex === -1 || currentIndex === phaseOrder.length - 1) return;
+
+    set({
+      state: {
+        ...state,
+        turnPhase: phaseOrder[currentIndex + 1],
+      },
     });
   },
 }));

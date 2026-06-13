@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card } from '../types';
 import { GameConfig } from '../config/gameConfig';
+import { generateId } from '../utils/generateId';
 
 export type SavedDeck = {
   id: string;
@@ -23,10 +24,6 @@ interface DeckStore {
   openDeck: (deckId: string) => void;
   deleteDeck: (deckId: string) => void;
 }
-
-const generateId = (): string =>
-  Math.random().toString(36).substring(2, 15) +
-  Math.random().toString(36).substring(2, 15);
 
 const makeCard = (
   name: string,

@@ -1,5 +1,4 @@
 import { Card, Player, GameState } from '../../types';
-import { BaseRules } from '../baseRules';
 
 // Exemple de règle spéciale : Shadow Realm (cartes shadow gagnent +1 attack au début du tour)
 export const shadowRealmRules = {

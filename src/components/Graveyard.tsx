@@ -3,9 +3,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal
 } from 'react-native';
-import { Player, Card } from '../types';
+import { Player } from '../types';
 import { CardComponent } from './Card';
-import { GameConfig } from '../config/gameConfig';
 
 interface GraveyardProps {
   player: Player;

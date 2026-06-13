@@ -4,6 +4,13 @@ export type Element = typeof GameConfig.ELEMENTS[number];
 export type CardType = 'minion' | 'spell' | 'weapon';
 export type Rarity   = 'common' | 'rare' | 'epic' | 'legendary';
 export type GamePhase = 'home' | 'playing' | 'gameover';
+export type TurnPhase =
+  | 'draw'
+  | 'main1'
+  | 'attack'
+  | 'defense'
+  | 'main2'
+  | 'end';
 
 export interface Card {
   id: string;
@@ -38,6 +45,7 @@ export interface GameState {
   currentPlayerIndex: 0 | 1;
   turn: number;
   gamePhase: GamePhase;
+  turnPhase: TurnPhase;
   winner: Player | null;
   logs: string[];
 }
