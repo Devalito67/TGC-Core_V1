@@ -14,12 +14,12 @@ interface BoardProps {
 }
 
 const PHASES: { key: TurnPhase; label: string }[] = [
-  { key: 'draw',    label: 'Draw'    },
-  { key: 'main1',   label: 'Main 1'  },
-  { key: 'attack',  label: 'Attack'  },
+  { key: 'draw', label: 'Draw' },
+  { key: 'main1', label: 'Main 1' },
+  { key: 'attack', label: 'Attack' },
   { key: 'defense', label: 'Defense' },
-  { key: 'main2',   label: 'Main 2'  },
-  { key: 'end',     label: 'End'     },
+  { key: 'main2', label: 'Main 2' },
+  { key: 'end', label: 'End' },
 ];
 
 export const Board: React.FC<BoardProps> = ({
@@ -136,7 +136,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     backgroundColor: '#0c0e11',
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingHorizontal: 10,
   },
   battlefield: {
     flex: 1,

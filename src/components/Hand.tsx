@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -36,7 +37,6 @@ export const Hand: React.FC<HandProps> = ({ cards, leftOffset = 0, rightOffset =
   const playSpell = useGameStore((s) => s.playSpell);
   const state = useGameStore((s) => s.state);
 
-  const currentPlayer = state.players[state.currentPlayerIndex];
   const opponent = state.players[(state.currentPlayerIndex + 1) % 2];
 
   const [focusedCard, setFocusedCard] = useState<Card | null>(null);

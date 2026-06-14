@@ -9,7 +9,6 @@ interface RightPanelProps {
     turnPhase: TurnPhase;
     onEndTurn: () => void;
     onNextPhase: () => void;
-    onLayout: (width: number) => void;
 }
 
 export const RightPanel: React.FC<RightPanelProps> = ({
@@ -18,7 +17,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     turnPhase,
     onNextPhase,
     onEndTurn,
-    onLayout,
 }) => {
     const isEndPhase = turnPhase === 'end';
 
@@ -33,32 +31,22 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     return (
         <View
             style={styles.container}
-            onLayout={(e) => onLayout(e.nativeEvent.layout.width)}
         >
-            <View style={styles.sidebarRight}>
-                <Graveyard player={opponent} isOwn={false} />
+            <Graveyard player={opponent} isOwn={false} />
 
-                <TouchableOpacity style={styles.endTurnButton} onPress={handleTurnButtonPress}>
-                    <Text style={styles.endTurnText}>
-                        {isEndPhase ? 'END\nTURN' : 'PASS'}
-                    </Text>
-                </TouchableOpacity>
+            <TouchableOpacity style={styles.endTurnButton} onPress={handleTurnButtonPress}>
+                <Text style={styles.endTurnText}>
+                    {isEndPhase ? 'END\nTURN' : 'PASS'}
+                </Text>
+            </TouchableOpacity>
 
-                <Graveyard player={player} isOwn />
-            </View>
+            <Graveyard player={player} isOwn />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        justifyContent: 'center',
-    },
-    sidebarRight: {
         width: 80,
         justifyContent: 'space-between',
         alignItems: 'center',

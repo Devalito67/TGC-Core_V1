@@ -18,9 +18,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const resetGame = useGameStore((s) => s.resetGame);
   const attackWithCard = useGameStore((s) => s.attackWithCard);
   const attackPlayer = useGameStore((s) => s.attackPlayer);
+
   const turnPhase = state.turnPhase;
-  const [leftWidth, setLeftWidth] = useState(0);
-  const [rightWidth, setRightWidth] = useState(0);
   const [selectedAttackerId, setSelectedAttackerId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +36,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const currentPlayer = state.players[state.currentPlayerIndex];
   const opponent = state.players[state.currentPlayerIndex === 0 ? 1 : 0];
   const isGameActive = state.gamePhase === 'playing';
-
 
   if (state.gamePhase === 'home') {
     return (
@@ -62,36 +60,35 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
       <StatusBar hidden />
 
       <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-        <View style={styles.boardWrapper}>
-          <Board
+        <View style={styles.gameRow}>
+          <LeftPanel
             player={currentPlayer}
             opponent={opponent}
-            isCurrentPlayer={isGameActive}
-            turnPhase={turnPhase}
             selectedAttackerId={selectedAttackerId}
-            onSelectAttacker={setSelectedAttackerId}
-            onAttackDefender={handleAttackDefender}
+            onAttackHero={handleAttackHero}
           />
+
+          <View style={styles.centerColumn}>
+            <Board
+              player={currentPlayer}
+              opponent={opponent}
+              isCurrentPlayer={isGameActive}
+              turnPhase={turnPhase}
+              selectedAttackerId={selectedAttackerId}
+              onSelectAttacker={setSelectedAttackerId}
+              onAttackDefender={handleAttackDefender}
+            />
+
+            <Hand cards={currentPlayer.hand} />
+          </View>
+
           <RightPanel
             player={currentPlayer}
             opponent={opponent}
             turnPhase={turnPhase}
             onEndTurn={endTurn}
             onNextPhase={nextTurnPhase}
-            onLayout={setRightWidth}
           />
-          <LeftPanel
-            player={currentPlayer}
-            opponent={opponent}
-            selectedAttackerId={selectedAttackerId}
-            onAttackHero={handleAttackHero}
-            onLayout={setLeftWidth} />
-        </View>
-
-        <View style={styles.overlayUi}>
-          <View style={styles.handWrapper}>
-            <Hand cards={currentPlayer.hand} leftOffset={leftWidth} rightOffset={rightWidth} />
-          </View>
         </View>
 
         <GameOverModal
@@ -124,23 +121,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Sora',
     letterSpacing: 2,
   },
-  boardWrapper: {
+  gameRow: {
     flex: 1,
-    position: 'relative'
-  },
-  overlayUi: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 140,
     flexDirection: 'row',
-    pointerEvents: 'box-none',
-    zIndex: 10,
   },
-  handWrapper: {
+  centerColumn: {
     flex: 1,
-    justifyContent: 'flex-end',
-    pointerEvents: 'box-none',
   },
 });
