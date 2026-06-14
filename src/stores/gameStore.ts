@@ -2,12 +2,12 @@ import { create } from 'zustand';
 import { Card, GameState, Player, TurnPhase } from '../types';
 import { baseRules } from '../rules';
 import { GameConfig } from '../config/gameConfig';
-import { generateId } from '../utils/generateId';
+import { generateId } from '../utils';
 
 interface GameStore {
   state: GameState;
   initializeGame: (deck1: Card[], deck2: Card[], player1Name: string, player2Name: string) => void;
-  drawCard: () => void;
+  resolveDrawPhase: () => void;
   playCard: (card: Card) => void;
   endTurn: () => void;
   attackWithCard: (attackerId: string, defenderId: string) => void;
@@ -51,7 +51,7 @@ const initialState: GameState = {
   currentPlayerIndex: 0,
   turn: 1,
   gamePhase: 'home' as const,
-  turnPhase: 'draw',
+  turnPhase: 'main1',
   winner: null,
   logs: [],
 };
@@ -73,15 +73,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       logs: ['⚔️ Que la bataille commence !'],
     };
 
-    // Tour de départ : mana joueur 1
     newState = baseRules.onTurnStart(newState, newState.players[0]);
 
-    // ✅ Pioche initiale joueur 1
     for (let i = 0; i < GameConfig.STARTING_HAND_SIZE; i++) {
       newState = baseRules.onCardDraw(newState, newState.players[0]);
     }
 
-    // ✅ Pioche initiale joueur 2
     for (let i = 0; i < GameConfig.STARTING_HAND_SIZE; i++) {
       newState = baseRules.onCardDraw(newState, newState.players[1]);
     }
@@ -89,19 +86,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ state: newState });
   },
 
-  drawCard: () => {
+  resolveDrawPhase: () => {
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
     if (state.turnPhase !== 'draw') return;
 
     const player = state.players[state.currentPlayerIndex];
     const newState = baseRules.onCardDraw(state, player);
-
     const winner = baseRules.checkWinCondition(newState);
+
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : { ...newState, turnPhase: 'main1' }
+        : { ...newState, turnPhase: 'main1' },
     });
   },
 
@@ -112,12 +109,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const player = state.players[state.currentPlayerIndex];
     const newState = baseRules.onCardPlay(state, player, card);
-
     const winner = baseRules.checkWinCondition(newState);
+
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : newState,
     });
   },
 
@@ -125,14 +122,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
 
-    const newState = baseRules.onEndTurn(state);
+    const nextPlayerIndex = state.currentPlayerIndex === 0 ? 1 : 0;
+    const turnIncrement = nextPlayerIndex === 0 ? 1 : 0;
+
+    let newState: GameState = {
+      ...state,
+      currentPlayerIndex: nextPlayerIndex,
+      turn: state.turn + turnIncrement,
+      turnPhase: 'draw',
+    };
+
+    const nextPlayer = newState.players[nextPlayerIndex];
+    newState = baseRules.onTurnStart(newState, nextPlayer);
 
     const winner = baseRules.checkWinCondition(newState);
-    set({
-      state: winner
-        ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : { ...newState, turnPhase: 'draw' }
-    });
+    if (winner) {
+      set({
+        state: { ...newState, gamePhase: 'gameover', winner },
+      });
+      return;
+    }
+
+    set({ state: newState });
+    get().resolveDrawPhase();
   },
 
   attackWithCard: (attackerId, defenderId) => {
@@ -152,7 +164,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { damage: dmgToDefender } = baseRules.calculateAttack(attacker, defender);
     const { damage: dmgToAttacker } = baseRules.calculateAttack(defender, attacker);
 
-    // Applique les dégâts des deux côtés
     const newAttackerBoard = player.board
       .map(c => c.id === attackerId ? { ...c, health: c.health - dmgToAttacker } : c)
       .filter(c => c.health > 0);
@@ -178,7 +189,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : newState,
     });
   },
 
@@ -213,7 +224,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : newState,
     });
   },
 
@@ -230,7 +241,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
     const opponent = state.players[opponentIndex];
 
-    // Résout la cible si besoin
     const target = targetCardId
       ? opponent.board.find(c => c.id === targetCardId)
       : undefined;
@@ -240,7 +250,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: winner
         ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState
+        : newState,
     });
   },
 
@@ -260,10 +270,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { state } = get();
     if (state.gamePhase !== 'playing') return;
 
-    const phaseOrder: TurnPhase[] = ['draw', 'main1', 'attack', 'defense', 'main2', 'end'];
+    const phaseOrder: TurnPhase[] = ['main1', 'attack', 'defense', 'main2', 'end'];
     const currentIndex = phaseOrder.indexOf(state.turnPhase);
 
-    if (currentIndex === -1 || currentIndex === phaseOrder.length - 1) return;
+    if (currentIndex === -1 || currentIndex >= phaseOrder.length - 1) return;
 
     set({
       state: {

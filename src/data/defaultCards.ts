@@ -44,6 +44,19 @@ export const defaultCards: Card[] = [
     rarity: 'epic',
     version: '1.0',
   },
+    {
+    id: generateId(),
+    name: "Chasseur d'Ombres",
+    description: "Insaisissable dans l'obscurité",
+    cost: 2,
+    attack: 2,
+    health: 2,
+    maxHealth: 2,
+    type: 'minion',
+    element: 'shadow',
+    rarity: 'common',
+    version: '1.0',
+  },
   {
     id: generateId(),
     name: 'Boule de Feu',
@@ -85,4 +98,5 @@ export const defaultCards: Card[] = [
     rarity: 'legendary',
     version: '1.0',
   },
+
 ];

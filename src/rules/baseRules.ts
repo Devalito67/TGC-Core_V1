@@ -99,11 +99,17 @@ export const baseRules = {
       ...state,
       currentPlayerIndex: nextIdx,
       turn: newTurn,
+      turnPhase: 'draw',
       logs: [...state.logs, `⏭️ Au tour de ${nextPlayer.name}`],
     };
+
     newState = baseRules.onTurnStart(newState, nextPlayer);
     newState = baseRules.onCardDraw(newState, newState.players[nextIdx]);
-    return newState;
+
+    return {
+      ...newState,
+      turnPhase: 'main1',
+    };
   },
 
   // Peut jouer cette carte ?

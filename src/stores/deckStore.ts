@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card } from '../types';
 import { GameConfig } from '../config/gameConfig';
-import { generateId } from '../utils/generateId';
+import { generateId } from '../utils';
 
 export type SavedDeck = {
   id: string;
