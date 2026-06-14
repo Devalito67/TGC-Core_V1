@@ -16,8 +16,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const nextTurnPhase = useGameStore((s) => s.nextTurnPhase);
   const endTurn = useGameStore((s) => s.endTurn);
   const resetGame = useGameStore((s) => s.resetGame);
-  const attackWithCard = useGameStore((s) => s.attackWithCard);
-  const attackPlayer = useGameStore((s) => s.attackPlayer);
+
+  const selectAttackTarget = useGameStore((s) => s.selectAttackTarget);
+  const confirmAttackPhase = useGameStore((s) => s.confirmAttackPhase);
+  const assignDefender = useGameStore((s) => s.assignDefender);
+  const confirmDefensePhase = useGameStore((s) => s.confirmDefensePhase);
 
   const turnPhase = state.turnPhase;
   const [selectedAttackerId, setSelectedAttackerId] = useState<string | null>(null);
@@ -45,14 +48,29 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
     );
   }
 
-  const handleAttackHero = (attackerId: string) => {
-    attackPlayer(attackerId);
+  const handleSelectAttacker = (attackerId: string | null) => {
+    if (turnPhase !== 'attack') return;
+    setSelectedAttackerId(attackerId);
+  };
+
+  const handleSelectAttackTarget = (targetType: 'hero' | 'unit', targetId?: string) => {
+    if (!selectedAttackerId || turnPhase !== 'attack') return;
+    selectAttackTarget(selectedAttackerId, { type: targetType, targetId });
     setSelectedAttackerId(null);
   };
 
-  const handleAttackDefender = (attackerId: string, defenderId: string) => {
-    attackWithCard(attackerId, defenderId);
+  const handleConfirmAttackPhase = () => {
+    confirmAttackPhase();
     setSelectedAttackerId(null);
+  };
+
+  const handleAssignDefender = (attackerId: string, blockerId: string) => {
+    if (turnPhase !== 'defense') return;
+    assignDefender(attackerId, blockerId);
+  };
+
+  const handleConfirmDefensePhase = () => {
+    confirmDefensePhase();
   };
 
   return (
@@ -65,7 +83,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
             player={currentPlayer}
             opponent={opponent}
             selectedAttackerId={selectedAttackerId}
-            onAttackHero={handleAttackHero}
+            onAttackHero={handleSelectAttackTarget}
           />
 
           <View style={styles.centerColumn}>
@@ -75,8 +93,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
               isCurrentPlayer={isGameActive}
               turnPhase={turnPhase}
               selectedAttackerId={selectedAttackerId}
-              onSelectAttacker={setSelectedAttackerId}
-              onAttackDefender={handleAttackDefender}
+              onSelectAttacker={handleSelectAttacker}
+              onAttackDefender={handleSelectAttackTarget}
+              onConfirmAttack={handleConfirmAttackPhase}
+              onAssignDefender={handleAssignDefender}
+              onConfirmDefense={handleConfirmDefensePhase}
             />
 
             <Hand cards={currentPlayer.hand} />

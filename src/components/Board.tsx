@@ -9,8 +9,11 @@ interface BoardProps {
   isCurrentPlayer: boolean;
   turnPhase: TurnPhase;
   selectedAttackerId: string | null;
-  onSelectAttacker: (id: string | null) => void;
-  onAttackDefender: (attackerId: string, defenderId: string) => void;
+  onSelectAttacker: (attackerId: string | null) => void;
+  onAttackDefender: (targetType: 'hero' | 'unit', targetId?: string) => void;
+  onConfirmAttack: () => void;
+  onAssignDefender: (attackerId: string, blockerId: string) => void;
+  onConfirmDefense: () => void;
 }
 
 const PHASES: { key: TurnPhase; label: string }[] = [
@@ -30,6 +33,9 @@ export const Board: React.FC<BoardProps> = ({
   selectedAttackerId,
   onSelectAttacker,
   onAttackDefender,
+  onConfirmAttack,
+  onAssignDefender,
+  onConfirmDefense,
 }) => {
   const handleSelectAttacker = (cardId: string) => {
     if (!isCurrentPlayer) return;
@@ -40,19 +46,27 @@ export const Board: React.FC<BoardProps> = ({
     onSelectAttacker(selectedAttackerId === cardId ? null : cardId);
   };
 
-  const handleAttackDefender = (defenderId: string) => {
-    if (!selectedAttackerId) {
-      Alert.alert('⚔️', "Sélectionne d'abord une de tes cartes pour attaquer !");
-      return;
-    }
-    onAttackDefender(selectedAttackerId, defenderId);
+  const handleSelectTargetOnUnit = (targetId: string) => {
+    if (!selectedAttackerId || turnPhase !== 'attack') return;
+    onAttackDefender('unit', targetId);
     onSelectAttacker(null);
+  };
+
+  const handleSelectTargetOnHero = () => {
+    if (!selectedAttackerId || turnPhase !== 'attack') return;
+    onAttackDefender('hero');
+    onSelectAttacker(null);
+  };
+
+  const handleAssignDefenderOnClick = (blockerId: string) => {
+    if (!selectedAttackerId || turnPhase !== 'defense') return;
+    onAssignDefender(selectedAttackerId, blockerId);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.battlefield}>
-        {/* Plateau adverse */}
+        {/* Plateau adverse pendant attack :on est cible */}
         <View style={styles.opponentBoard}>
           <ScrollView horizontal contentContainerStyle={styles.cardsScroll}>
             {opponent.board.length === 0 ? (
@@ -61,7 +75,7 @@ export const Board: React.FC<BoardProps> = ({
               opponent.board.map((card) => (
                 <TouchableOpacity
                   key={card.id}
-                  onPress={() => handleAttackDefender(card.id)}
+                  onPress={() => handleSelectTargetOnUnit(card.id)}
                   style={[styles.cardSlot, !!selectedAttackerId && styles.cardSlotTargetable]}
                 >
                   <CardComponent card={card} size="small" />
@@ -92,6 +106,13 @@ export const Board: React.FC<BoardProps> = ({
           })}
         </View>
 
+        {/* Pendant defense : on voit les attaquants ennemis + bouton pour défendre */}
+        {turnPhase === 'defense' && (
+          <View style={styles.defenseHintContainer}>
+            <Text style={styles.defenseHintText}>Sélectionne un défenseur pour intercepter une attaque vers le héros</Text>
+          </View>
+        )}
+
         {/* Plateau joueur */}
         <View style={styles.playerBoard}>
           <ScrollView horizontal contentContainerStyle={styles.cardsScroll}>
@@ -101,14 +122,26 @@ export const Board: React.FC<BoardProps> = ({
               player.board.map((card) => (
                 <TouchableOpacity
                   key={card.id}
-                  onPress={() => handleSelectAttacker(card.id)}
+                  onPress={() => {
+                    if (card.summoningSickness) {
+                      Alert.alert('⏳', "Cette carte vient d'être invoquée, elle ne peut pas encore attaquer !");
+                      return;
+                    }
+                    handleSelectAttacker(card.id);
+                  }}
                   style={[
                     styles.cardSlot,
                     turnPhase !== 'attack' && { opacity: 0.5 },
+                    card.summoningSickness && styles.cardSlotSick,
                     selectedAttackerId === card.id && styles.cardSlotSelected,
                   ]}
                 >
                   <CardComponent card={card} size="small" />
+                  {card.summoningSickness && (
+                    <View style={styles.sicknessBadge}>
+                      <Text style={styles.sicknessEmoji}>⏳</Text>
+                    </View>
+                  )}
                   {selectedAttackerId === card.id && (
                     <View style={styles.attackerBadge}>
                       <Text style={styles.attackerEmoji}>⚔️</Text>
@@ -122,9 +155,27 @@ export const Board: React.FC<BoardProps> = ({
       </View>
 
       {/* Overlay hint attaque */}
-      {selectedAttackerId && (
+      {selectedAttackerId && turnPhase === 'attack' && (
         <View style={styles.actionOverlay} pointerEvents="none">
-          <Text style={styles.actionOverlayText}>Select target or strike the Hero</Text>
+          <Text style={styles.actionOverlayText}>Sélectionne une cible (monstre ou héros) ou confirme la phase</Text>
+        </View>
+      )}
+
+      {/* Bouton confirmer attaque */}
+      {turnPhase === 'attack' && (
+        <View style={styles.confirmButtonContainer}>
+          <TouchableOpacity style={styles.confirmButton} onPress={onConfirmAttack}>
+            <Text style={styles.confirmButtonText}>Confirmer Attack</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Bouton confirmer défense */}
+      {turnPhase === 'defense' && (
+        <View style={styles.confirmButtonContainer}>
+          <TouchableOpacity style={styles.confirmButton} onPress={onConfirmDefense}>
+            <Text style={styles.confirmButtonText}>Confirmer Defense</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -260,5 +311,51 @@ const styles = StyleSheet.create({
   },
   phaseConnectorActive: {
     backgroundColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  defenseHintContainer: {
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  defenseHintText: {
+    color: '#d4af37',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  confirmButtonContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  confirmButton: {
+    backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    borderWidth: 1,
+    borderColor: '#d4af37',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  confirmButtonText: {
+    color: '#d4af37',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cardSlotSick: {
+    opacity: 0.4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  sicknessBadge: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    backgroundColor: '#1a1c1f',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sicknessEmoji: {
+    fontSize: 12,
   },
 });

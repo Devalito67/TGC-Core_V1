@@ -6,7 +6,7 @@ interface LeftPanelProps {
     player: Player;
     opponent: Player;
     selectedAttackerId: string | null;
-    onAttackHero: (attackerId: string) => void;
+    onAttackHero: (targetType: "hero" | "unit", targetId?: string) => void;
 }
 
 export const LeftPanel: React.FC<LeftPanelProps> = ({
@@ -20,7 +20,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
             Alert.alert('⚔️', "Sélectionne d'abord une de tes cartes pour attaquer !");
             return;
         }
-        onAttackHero(selectedAttackerId);
+        onAttackHero('hero');
     };
 
     return (

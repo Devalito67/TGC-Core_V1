@@ -4,18 +4,49 @@ import { baseRules } from '../rules';
 import { GameConfig } from '../config/gameConfig';
 import { generateId } from '../utils';
 
+type AttackTarget = {
+  type: 'hero' | 'unit';
+  targetId?: string;
+};
+
+type PendingAttack = {
+  attackerId: string;
+  target: AttackTarget;
+};
+
+type PendingDefense = {
+  attackerId: string;
+  blockerId: string;
+};
+
+interface CombatState {
+  pendingAttacks: PendingAttack[];
+  pendingDefenses: PendingDefense[];
+  attackConfirmed: boolean;
+  defenseConfirmed: boolean;
+}
+
+interface ExtendedGameState extends GameState {
+  combat: CombatState;
+}
+
 interface GameStore {
-  state: GameState;
+  state: ExtendedGameState;
   initializeGame: (deck1: Card[], deck2: Card[], player1Name: string, player2Name: string) => void;
   resolveDrawPhase: () => void;
   playCard: (card: Card) => void;
   endTurn: () => void;
-  attackWithCard: (attackerId: string, defenderId: string) => void;
-  attackPlayer: (attackerId: string) => void;
   resetGame: () => void;
   playSpell: (card: Card, targetCardId?: string) => void;
   setTurnPhase: (phase: TurnPhase) => void;
   nextTurnPhase: () => void;
+  selectAttackTarget: (attackerId: string, target: AttackTarget) => void;
+  removePendingAttack: (attackerId: string) => void;
+  confirmAttackPhase: () => void;
+  assignDefender: (attackerId: string, blockerId: string) => void;
+  cancelDefense: (attackerId: string) => void;
+  confirmDefensePhase: () => void;
+  resolveCombatPhase: () => void;
 }
 
 const createInitialPlayer = (deck: Card[], name: string): Player => ({
@@ -46,7 +77,14 @@ const emptyPlayer: Player = {
   hasPlayedCardThisTurn: false,
 };
 
-const initialState: GameState = {
+const emptyCombatState: CombatState = {
+  pendingAttacks: [],
+  pendingDefenses: [],
+  attackConfirmed: false,
+  defenseConfirmed: false,
+};
+
+const initialState: ExtendedGameState = {
   players: [emptyPlayer, emptyPlayer],
   currentPlayerIndex: 0,
   turn: 1,
@@ -54,6 +92,7 @@ const initialState: GameState = {
   turnPhase: 'main1',
   winner: null,
   logs: [],
+  combat: emptyCombatState,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -63,7 +102,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const player1 = createInitialPlayer(deck1, player1Name);
     const player2 = createInitialPlayer(deck2, player2Name);
 
-    let newState: GameState = {
+    let newState: ExtendedGameState = {
       players: [player1, player2],
       currentPlayerIndex: 0,
       turn: 1,
@@ -71,16 +110,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
       turnPhase: 'main1',
       winner: null,
       logs: ['⚔️ Que la bataille commence !'],
+      combat: emptyCombatState,
     };
 
-    newState = baseRules.onTurnStart(newState, newState.players[0]);
+    newState = {
+      ...(baseRules.onTurnStart(newState, newState.players[0]) as ExtendedGameState),
+      combat: emptyCombatState,
+    };
 
     for (let i = 0; i < GameConfig.STARTING_HAND_SIZE; i++) {
-      newState = baseRules.onCardDraw(newState, newState.players[0]);
+      newState = baseRules.onCardDraw(newState, newState.players[0]) as ExtendedGameState;
     }
 
     for (let i = 0; i < GameConfig.STARTING_HAND_SIZE; i++) {
-      newState = baseRules.onCardDraw(newState, newState.players[1]);
+      newState = baseRules.onCardDraw(newState, newState.players[1]) as ExtendedGameState;
     }
 
     set({ state: newState });
@@ -92,7 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (state.turnPhase !== 'draw') return;
 
     const player = state.players[state.currentPlayerIndex];
-    const newState = baseRules.onCardDraw(state, player);
+    const newState = baseRules.onCardDraw(state, player) as ExtendedGameState;
     const winner = baseRules.checkWinCondition(newState);
 
     set({
@@ -108,7 +151,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (state.turnPhase !== 'main1' && state.turnPhase !== 'main2') return;
 
     const player = state.players[state.currentPlayerIndex];
-    const newState = baseRules.onCardPlay(state, player, card);
+    const newState = baseRules.onCardPlay(state, player, card) as ExtendedGameState;
     const winner = baseRules.checkWinCondition(newState);
 
     set({
@@ -125,15 +168,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextPlayerIndex = state.currentPlayerIndex === 0 ? 1 : 0;
     const turnIncrement = nextPlayerIndex === 0 ? 1 : 0;
 
-    let newState: GameState = {
+    let newState: ExtendedGameState = {
       ...state,
       currentPlayerIndex: nextPlayerIndex,
       turn: state.turn + turnIncrement,
       turnPhase: 'draw',
+      combat: emptyCombatState,
     };
 
     const nextPlayer = newState.players[nextPlayerIndex];
-    newState = baseRules.onTurnStart(newState, nextPlayer);
+    newState = {
+      ...(baseRules.onTurnStart(newState, nextPlayer) as ExtendedGameState),
+      combat: emptyCombatState,
+    };
 
     const winner = baseRules.checkWinCondition(newState);
     if (winner) {
@@ -145,87 +192,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ state: newState });
     get().resolveDrawPhase();
-  },
-
-  attackWithCard: (attackerId, defenderId) => {
-    const { state } = get();
-    if (state.gamePhase !== 'playing') return;
-    if (state.turnPhase !== 'attack') return;
-
-    const player = state.players[state.currentPlayerIndex];
-    const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
-    const opponent = state.players[opponentIndex];
-
-    const attacker = player.board.find(c => c.id === attackerId);
-    const defender = opponent.board.find(c => c.id === defenderId);
-
-    if (!attacker || !defender) return;
-
-    const { damage: dmgToDefender } = baseRules.calculateAttack(attacker, defender);
-    const { damage: dmgToAttacker } = baseRules.calculateAttack(defender, attacker);
-
-    const newAttackerBoard = player.board
-      .map(c => c.id === attackerId ? { ...c, health: c.health - dmgToAttacker } : c)
-      .filter(c => c.health > 0);
-
-    const newDefenderBoard = opponent.board
-      .map(c => c.id === defenderId ? { ...c, health: c.health - dmgToDefender } : c)
-      .filter(c => c.health > 0);
-
-    const newPlayers = [...state.players] as [Player, Player];
-    newPlayers[state.currentPlayerIndex] = { ...player, board: newAttackerBoard };
-    newPlayers[opponentIndex] = { ...opponent, board: newDefenderBoard };
-
-    const newState: GameState = {
-      ...state,
-      players: newPlayers,
-      logs: [
-        ...state.logs,
-        `⚔️ ${attacker.name} attaque ${defender.name} (${dmgToDefender} dégâts)`,
-      ],
-    };
-
-    const winner = baseRules.checkWinCondition(newState);
-    set({
-      state: winner
-        ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState,
-    });
-  },
-
-  attackPlayer: (attackerId) => {
-    const { state } = get();
-    if (state.gamePhase !== 'playing') return;
-    if (state.turnPhase !== 'attack') return;
-
-    const player = state.players[state.currentPlayerIndex];
-    const opponentIndex = state.currentPlayerIndex === 0 ? 1 : 0;
-    const opponent = state.players[opponentIndex];
-
-    const attacker = player.board.find(c => c.id === attackerId);
-    if (!attacker) return;
-
-    const newPlayers = [...state.players] as [Player, Player];
-    newPlayers[opponentIndex] = {
-      ...opponent,
-      health: opponent.health - attacker.attack,
-    };
-
-    const newState: GameState = {
-      ...state,
-      players: newPlayers,
-      logs: [
-        ...state.logs,
-        `💥 ${attacker.name} attaque ${opponent.name} directement (-${attacker.attack} PV)`,
-      ],
-    };
-
-    const winner = baseRules.checkWinCondition(newState);
-    set({
-      state: winner
-        ? { ...newState, gamePhase: 'gameover' as const, winner }
-        : newState,
-    });
   },
 
   resetGame: () => {
@@ -245,7 +211,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ? opponent.board.find(c => c.id === targetCardId)
       : undefined;
 
-    const newState = baseRules.onCardPlay(state, player, card, target);
+    const newState = baseRules.onCardPlay(state, player, card, target) as ExtendedGameState;
     const winner = baseRules.checkWinCondition(newState);
     set({
       state: winner
@@ -280,6 +246,220 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...state,
         turnPhase: phaseOrder[currentIndex + 1],
       },
+    });
+  },
+
+  selectAttackTarget: (attackerId, target) => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'attack') return;
+
+    const player = state.players[state.currentPlayerIndex];
+    const attacker = player.board.find(c => c.id === attackerId);
+    if (!attacker) return;
+    if (attacker.summoningSickness) return;
+
+    const nextPendingAttacks = state.combat.pendingAttacks.filter(a => a.attackerId !== attackerId);
+    nextPendingAttacks.push({ attackerId, target });
+
+    set({
+      state: {
+        ...state,
+        combat: {
+          ...state.combat,
+          pendingAttacks: nextPendingAttacks,
+          attackConfirmed: false,
+        },
+      },
+    });
+  },
+
+  removePendingAttack: (attackerId) => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'attack') return;
+
+    set({
+      state: {
+        ...state,
+        combat: {
+          ...state.combat,
+          pendingAttacks: state.combat.pendingAttacks.filter(a => a.attackerId !== attackerId),
+          pendingDefenses: state.combat.pendingDefenses.filter(d => d.attackerId !== attackerId),
+          attackConfirmed: false,
+          defenseConfirmed: false,
+        },
+      },
+    });
+  },
+
+  confirmAttackPhase: () => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'attack') return;
+
+    set({
+      state: {
+        ...state,
+        turnPhase: 'defense',
+        combat: {
+          ...state.combat,
+          attackConfirmed: true,
+          defenseConfirmed: false,
+          pendingDefenses: [],
+        },
+      },
+    });
+  },
+
+  assignDefender: (attackerId, blockerId) => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'defense') return;
+
+    const defenderIndex = state.currentPlayerIndex === 0 ? 1 : 0;
+    const defenderPlayer = state.players[defenderIndex];
+
+    const attack = state.combat.pendingAttacks.find(a => a.attackerId === attackerId);
+    if (!attack) return;
+    if (attack.target.type !== 'hero') return;
+
+    const blocker = defenderPlayer.board.find(c => c.id === blockerId);
+    if (!blocker) return;
+
+    const blockerAlreadyAssigned = state.combat.pendingDefenses.some(d => d.blockerId === blockerId);
+    if (blockerAlreadyAssigned) return;
+
+    const nextPendingDefenses = state.combat.pendingDefenses.filter(d => d.attackerId !== attackerId);
+    nextPendingDefenses.push({ attackerId, blockerId });
+
+    set({
+      state: {
+        ...state,
+        combat: {
+          ...state.combat,
+          pendingDefenses: nextPendingDefenses,
+          defenseConfirmed: false,
+        },
+      },
+    });
+  },
+
+  cancelDefense: (attackerId) => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'defense') return;
+
+    set({
+      state: {
+        ...state,
+        combat: {
+          ...state.combat,
+          pendingDefenses: state.combat.pendingDefenses.filter(d => d.attackerId !== attackerId),
+          defenseConfirmed: false,
+        },
+      },
+    });
+  },
+
+  confirmDefensePhase: () => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing' || state.turnPhase !== 'defense') return;
+
+    set({
+      state: {
+        ...state,
+        combat: {
+          ...state.combat,
+          defenseConfirmed: true,
+        },
+      },
+    });
+
+    get().resolveCombatPhase();
+  },
+
+  resolveCombatPhase: () => {
+    const { state } = get();
+    if (state.gamePhase !== 'playing') return;
+
+    const attackerIndex = state.currentPlayerIndex;
+    const defenderIndex = attackerIndex === 0 ? 1 : 0;
+
+    const attackerPlayer = state.players[attackerIndex];
+    const defenderPlayer = state.players[defenderIndex];
+
+    let updatedAttackerBoard = [...attackerPlayer.board];
+    let updatedDefenderBoard = [...defenderPlayer.board];
+    let updatedDefenderHealth = defenderPlayer.health;
+    const combatLogs = [...state.logs];
+
+    for (const attack of state.combat.pendingAttacks) {
+      const attacker = updatedAttackerBoard.find(c => c.id === attack.attackerId);
+      if (!attacker) continue;
+
+      const assignedDefense = state.combat.pendingDefenses.find(d => d.attackerId === attack.attackerId);
+
+      if (assignedDefense) {
+        const blocker = updatedDefenderBoard.find(c => c.id === assignedDefense.blockerId);
+        if (!blocker) continue;
+
+        const { damage: dmgToBlocker } = baseRules.calculateAttack(attacker, blocker);
+        const { damage: dmgToAttacker } = baseRules.calculateAttack(blocker, attacker);
+
+        updatedAttackerBoard = updatedAttackerBoard
+          .map(c => c.id === attacker.id ? { ...c, health: c.health - dmgToAttacker } : c)
+          .filter(c => c.health > 0);
+
+        updatedDefenderBoard = updatedDefenderBoard
+          .map(c => c.id === blocker.id ? { ...c, health: c.health - dmgToBlocker } : c)
+          .filter(c => c.health > 0);
+
+        combatLogs.push(`🛡️ ${blocker.name} bloque ${attacker.name} (${dmgToBlocker}/${dmgToAttacker})`);
+        continue;
+      }
+
+      if (attack.target.type === 'hero') {
+        updatedDefenderHealth -= attacker.attack;
+        combatLogs.push(`💥 ${attacker.name} attaque ${defenderPlayer.name} directement (-${attacker.attack} PV)`);
+        continue;
+      }
+
+      if (attack.target.type === 'unit' && attack.target.targetId) {
+        const targetUnit = updatedDefenderBoard.find(c => c.id === attack.target.targetId);
+        if (!targetUnit) continue;
+
+        const { damage: dmgToDefender } = baseRules.calculateAttack(attacker, targetUnit);
+        const { damage: dmgToAttacker } = baseRules.calculateAttack(targetUnit, attacker);
+
+        updatedAttackerBoard = updatedAttackerBoard
+          .map(c => c.id === attacker.id ? { ...c, health: c.health - dmgToAttacker } : c)
+          .filter(c => c.health > 0);
+
+        updatedDefenderBoard = updatedDefenderBoard
+          .map(c => c.id === targetUnit.id ? { ...c, health: c.health - dmgToDefender } : c)
+          .filter(c => c.health > 0);
+
+        combatLogs.push(`⚔️ ${attacker.name} attaque ${targetUnit.name} (${dmgToDefender}/${dmgToAttacker})`);
+      }
+    }
+
+    const newPlayers = [...state.players] as [Player, Player];
+    newPlayers[attackerIndex] = { ...attackerPlayer, board: updatedAttackerBoard };
+    newPlayers[defenderIndex] = {
+      ...defenderPlayer,
+      board: updatedDefenderBoard,
+      health: updatedDefenderHealth,
+    };
+
+    const newState: ExtendedGameState = {
+      ...state,
+      players: newPlayers,
+      turnPhase: 'main2',
+      logs: combatLogs,
+      combat: emptyCombatState,
+    };
+
+    const winner = baseRules.checkWinCondition(newState);
+    set({
+      state: winner
+        ? { ...newState, gamePhase: 'gameover' as const, winner }
+        : newState,
     });
   },
 }));

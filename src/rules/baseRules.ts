@@ -3,19 +3,26 @@ import { GameConfig } from '../config/gameConfig';
 import { spellEffects } from './spellEffects';
 
 export const baseRules = {
-
   // Début de tour : +1 mana, reset mana, reset hasPlayed
-  onTurnStart: (state: GameState, player: Player): GameState => {
-    const newMaxMana = Math.min(player.maxMana + GameConfig.MANA_PER_TURN, GameConfig.MANA_MAX);
-    const idx = state.players.findIndex(p => p.id === player.id) as 0 | 1;
-    const newPlayers = [...state.players] as [Player, Player];
-    newPlayers[idx] = { ...player, maxMana: newMaxMana, mana: newMaxMana, hasPlayedCardThisTurn: false };
-    return {
-      ...state,
-      players: newPlayers,
-      logs: [...state.logs, `🔄 Tour ${state.turn} — ${newPlayers[idx].name} | 💧 ${newMaxMana}/${newMaxMana}`],
-    };
-  },
+onTurnStart: (state: GameState, player: Player): GameState => {
+  const newMaxMana = Math.min(player.maxMana + GameConfig.MANA_PER_TURN, GameConfig.MANA_MAX);
+  const idx = state.players.findIndex(p => p.id === player.id) as 0 | 1;
+
+  const newPlayers = [...state.players] as [Player, Player];
+  newPlayers[idx] = {
+    ...player,
+    maxMana: newMaxMana,
+    mana: newMaxMana,
+    hasPlayedCardThisTurn: false,
+    board: player.board.map(c => ({ ...c, summoningSickness: false })), // ← fusionné ici
+  };
+
+  return {
+    ...state,
+    players: newPlayers, // ← un seul players
+    logs: [...state.logs, `🔄 Tour ${state.turn} — ${newPlayers[idx].name} | 💧 ${newMaxMana}/${newMaxMana}`],
+  };
+},
 
   // Pioche une carte
   onCardDraw: (state: GameState, player: Player): GameState => {
@@ -39,6 +46,7 @@ export const baseRules = {
       return { ...state, logs: [...state.logs, `❌ Impossible de jouer ${card.name}`] };
     }
 
+    const cardToBoard: Card = { ...card, summoningSickness: true, };
     const idx = state.players.findIndex(p => p.id === player.id) as 0 | 1;
     const newPlayers = [...state.players] as [Player, Player];
     newPlayers[idx] = {
@@ -49,13 +57,13 @@ export const baseRules = {
     let newState: GameState = { ...state, players: newPlayers };
 
     // Minion → terrain
-    if (card.type === 'minion') {
+    if (cardToBoard.type === 'minion') {
       if (player.board.length >= GameConfig.BOARD_MAX_CARDS) {
         return { ...state, logs: [...state.logs, `❌ Terrain plein !`] };
       }
       newPlayers[idx] = {
         ...newPlayers[idx],
-        board: [...newPlayers[idx].board, { ...card, health: card.maxHealth }],
+        board: [...newPlayers[idx].board, { ...cardToBoard, health: card.maxHealth }],
       };
       return {
         ...newState,

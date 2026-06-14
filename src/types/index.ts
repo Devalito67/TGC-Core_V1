@@ -23,6 +23,7 @@ export interface Card {
   type: CardType;
   element: Element;
   rarity: Rarity;
+  summoningSickness: boolean;
   version: string;    // Pour la gestion des mises à jour de cartes
 }
 
