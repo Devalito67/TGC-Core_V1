@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameStore } from '../stores';
 import { Hand, Board, GameOverModal } from '../components';
-import { lockLandscape, unlockOrientation } from '../utils/lockLandcape';
+import { lockLandscape, unlockOrientation } from '../utils';
+import { LeftPanel } from '../components/LeftPanel';
+import { RightPanel } from '../components/RightPanel';
 
 type GameScreenProps = {
   onBackToHome: () => void;
@@ -11,12 +13,15 @@ type GameScreenProps = {
 
 export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
   const state = useGameStore((s) => s.state);
-
+  const nextTurnPhase = useGameStore((s) => s.nextTurnPhase);
   const endTurn = useGameStore((s) => s.endTurn);
   const resetGame = useGameStore((s) => s.resetGame);
   const attackWithCard = useGameStore((s) => s.attackWithCard);
   const attackPlayer = useGameStore((s) => s.attackPlayer);
   const turnPhase = state.turnPhase;
+  const [leftWidth, setLeftWidth] = useState(0);
+  const [rightWidth, setRightWidth] = useState(0);
+  const [selectedAttackerId, setSelectedAttackerId] = useState<string | null>(null);
 
   useEffect(() => {
     lockLandscape();
@@ -24,6 +29,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
       unlockOrientation();
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedAttackerId(null);
+  }, [state.currentPlayerIndex, turnPhase]);
 
   const currentPlayer = state.players[state.currentPlayerIndex];
   const opponent = state.players[state.currentPlayerIndex === 0 ? 1 : 0];
@@ -38,6 +47,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
     );
   }
 
+  const handleAttackHero = (attackerId: string) => {
+    attackPlayer(attackerId);
+    setSelectedAttackerId(null);
+  };
+
+  const handleAttackDefender = (attackerId: string, defenderId: string) => {
+    attackWithCard(attackerId, defenderId);
+    setSelectedAttackerId(null);
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar hidden />
@@ -49,15 +68,29 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
             opponent={opponent}
             isCurrentPlayer={isGameActive}
             turnPhase={turnPhase}
-            onAttackSelf={attackWithCard}
-            onAttackOpponent={attackPlayer}
-            onEndTurn={endTurn}
+            selectedAttackerId={selectedAttackerId}
+            onSelectAttacker={setSelectedAttackerId}
+            onAttackDefender={handleAttackDefender}
           />
+          <RightPanel
+            player={currentPlayer}
+            opponent={opponent}
+            turnPhase={turnPhase}
+            onEndTurn={endTurn}
+            onNextPhase={nextTurnPhase}
+            onLayout={setRightWidth}
+          />
+          <LeftPanel
+            player={currentPlayer}
+            opponent={opponent}
+            selectedAttackerId={selectedAttackerId}
+            onAttackHero={handleAttackHero}
+            onLayout={setLeftWidth} />
         </View>
 
         <View style={styles.overlayUi}>
           <View style={styles.handWrapper}>
-            <Hand cards={currentPlayer.hand} />
+            <Hand cards={currentPlayer.hand} leftOffset={leftWidth} rightOffset={rightWidth} />
           </View>
         </View>
 
@@ -93,7 +126,7 @@ const styles = StyleSheet.create({
   },
   boardWrapper: {
     flex: 1,
-    zIndex: 1,
+    position: 'relative'
   },
   overlayUi: {
     position: 'absolute',
