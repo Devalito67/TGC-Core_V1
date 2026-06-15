@@ -297,7 +297,7 @@ export const Hand: React.FC<HandProps> = ({ cards, leftOffset = 0, rightOffset =
 const styles = StyleSheet.create({
   handContainer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -30,
     paddingVertical: 8,
     backgroundColor: 'rgba(0,0,0,0.25)',
   },

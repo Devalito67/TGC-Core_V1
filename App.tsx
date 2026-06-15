@@ -9,6 +9,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GameScreen, DeckBuilderScreen, HomeScreen } from './src/screens';
 import { useGameStore } from './src/stores';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 enableScreens();
 
@@ -21,7 +22,6 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const gamePhase = useGameStore((s) => s.state.gamePhase);
   const resetGame = useGameStore((s) => s.resetGame);
   const [isLandscape, setIsLandscape] = useState(false);
 
@@ -36,7 +36,7 @@ export default function App() {
       const orientation = await ScreenOrientation.getOrientationAsync();
       setIsLandscape(
         orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-          orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+        orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
       );
     };
 
@@ -46,7 +46,7 @@ export default function App() {
       const orientation = event.orientationInfo.orientation;
       setIsLandscape(
         orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-          orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+        orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
       );
     });
 
@@ -55,42 +55,40 @@ export default function App() {
     };
   }, []);
 
-  const handleReset = () => {
-    resetGame();
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar hidden={isLandscape} style="light" />
-      <View style={styles.content}>
-        <NavigationContainer>
-          <Stack.Navigator
-            initialRouteName="Home"
-            screenOptions={{
-              headerShown: false,
-              animation: 'slide_from_right',
-            }}
-          >
-            <Stack.Screen name="Home">
-              {(props) => <HomeScreen {...props} />}
-            </Stack.Screen>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar hidden={isLandscape} style="light" />
+        <View style={styles.content}>
+          <NavigationContainer>
+            <Stack.Navigator
+              initialRouteName="Home"
+              screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+              }}
+            >
+              <Stack.Screen name="Home">
+                {(props) => <HomeScreen {...props} />}
+              </Stack.Screen>
 
-            <Stack.Screen name="DeckBuilder">
-              {(props) => <DeckBuilderScreen {...props} />}
-            </Stack.Screen>
+              <Stack.Screen name="DeckBuilder">
+                {(props) => <DeckBuilderScreen {...props} />}
+              </Stack.Screen>
 
-            <Stack.Screen name="Game">
-              {(props) => (
-                <GameScreen
-                  {...props}
-                  onBackToHome={resetGame}
-                />
-              )}
-            </Stack.Screen>
-          </Stack.Navigator>
-        </NavigationContainer>
-      </View>
-    </SafeAreaView>
+              <Stack.Screen name="Game">
+                {(props) => (
+                  <GameScreen
+                    {...props}
+                    onBackToHome={resetGame}
+                  />
+                )}
+              </Stack.Screen>
+            </Stack.Navigator>
+          </NavigationContainer>
+        </View>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 

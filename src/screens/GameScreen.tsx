@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameStore } from '../stores';
-import { Hand, Board, GameOverModal } from '../components';
+import { Hand, GameOverModal } from '../components';
+import { BoardContainer } from '../components/BoardContainer';
 import { lockLandscape, unlockOrientation } from '../utils';
 import { LeftPanel } from '../components/LeftPanel';
 import { RightPanel } from '../components/RightPanel';
@@ -87,7 +88,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onBackToHome }) => {
           />
 
           <View style={styles.centerColumn}>
-            <Board
+            <BoardContainer
               player={currentPlayer}
               opponent={opponent}
               isCurrentPlayer={isGameActive}
