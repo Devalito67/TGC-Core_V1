@@ -24,7 +24,7 @@ export const Graveyard: React.FC<GraveyardProps> = ({ player, isOwn }) => {
       >
         <Text style={styles.graveyardIcon}>💀</Text>
         <Text style={styles.graveyardCount}>{count}</Text>
-        <Text style={styles.graveyardLabel}>{isOwn ? 'Cimetière' : `Cimetière\n${player.name}`}</Text>
+        <Text style={styles.graveyardLabel}>{isOwn ? `Cimetière\n${player.name}` : `Cimetière\n${player.name}`}</Text>
       </TouchableOpacity>
 
       {/* Modal de consultation */}

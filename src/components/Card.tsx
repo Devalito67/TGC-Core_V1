@@ -80,7 +80,7 @@ export const CardComponent: React.FC<CardComponentProps> = ({
       <View style={styles.stats}>
         <Text style={[styles.stat, { fontSize: statFontSize }]}>{card.cost}</Text>
         <Text style={[styles.stat, { fontSize: statFontSize }]}>⚔️{card.attack}</Text>
-        <Text style={[styles.stat, { fontSize: statFontSize }]}>❤️{card.health}</Text>
+        <Text style={[styles.stat, { fontSize: statFontSize }]}>🛡️{card.defense}</Text>
       </View>
 
       {card.description ? (

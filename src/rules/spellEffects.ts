@@ -26,8 +26,8 @@ export const spellEffects: Record<string, (
 
   if (targetCard) {
     const newBoard = opponent.board
-      .map(c => c.id === targetCard.id ? { ...c, health: c.health - DAMAGE } : c)
-      .filter(c => c.health > 0);
+      .map(c => c.id === targetCard.id ? { ...c, defense: c.defense - DAMAGE } : c)
+      .filter(c => c.defense > 0);
 
     const newPlayers = [...state.players] as [Player, Player];
     newPlayers[opponentIndex] = { ...opponent, board: newBoard };

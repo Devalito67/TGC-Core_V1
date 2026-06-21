@@ -133,7 +133,7 @@ export const DeckBuilderScreen: React.FC<DeckBuilderScreenProps> = ({ navigation
 
         map.set(key, {
           name: card.name,
-          mana: Number(card.manaCost ?? card.cost ?? card.mana ?? 0),
+          mana: Number(card.cost ?? 0),
           count: 0,
           entries: [],
           templateCard: template,

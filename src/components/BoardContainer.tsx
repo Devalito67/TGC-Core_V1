@@ -1,129 +1,113 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import {
-  Gesture,
-  GestureDetector,
-} from 'react-native-gesture-handler';
-import { Player, TurnPhase } from '../types';
+import { View, Animated, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { CombatAttack, CombatBlock, Player, TurnPhase } from '../types';
 import { Board } from './Board';
+import { useGameStore } from '../stores';
 
-type BoardFocus = 'player' | 'balanced' | 'opponent';
+type BoardFocus = 'player1' | 'balanced' | 'player2';
 
-const FOCUS_RATIOS: Record<BoardFocus, { opponent: number; player: number }> = {
-  player:   { opponent: 0.10, player: 0.90 },
-  balanced: { opponent: 0.40, player: 0.60 },
-  opponent: { opponent: 0.90, player: 0.10 },
-};
-
-const PHASE_DEFAULT_FOCUS: Partial<Record<TurnPhase, BoardFocus>> = {
-  main1:   'balanced',
-  attack:  'player',
-  defense: 'opponent',
-  main2:   'balanced',
-  end:     'balanced',
+const FOCUS_RATIOS: Record<BoardFocus, { player2: number; player1: number }> = {
+  player1: { player2: 0.10, player1: 0.90 },
+  balanced: { player2: 0.40, player1: 0.60 },
+  player2: { player2: 0.90, player1: 0.10 },
 };
 
 interface BoardContainerProps {
-  player: Player;
-  opponent: Player;
-  isCurrentPlayer: boolean;
+  player1: Player;
+  player2: Player;
+  currentPlayerIndex: 0 | 1;
   turnPhase: TurnPhase;
   selectedAttackerId: string | null;
-  onSelectAttacker: (attackerId: string | null) => void;
-  onAttackDefender: (targetType: 'hero' | 'unit', targetId?: string) => void;
-  onConfirmAttack: () => void;
-  onAssignDefender: (attackerId: string, blockerId: string) => void;
-  onConfirmDefense: () => void;
+  onSelectedAttackerChange: (id: string | null) => void;
 }
 
 export const BoardContainer: React.FC<BoardContainerProps> = ({
-  player,
-  opponent,
-  isCurrentPlayer,
-  turnPhase,
+  player1, player2, currentPlayerIndex, turnPhase, onSelectedAttackerChange,
   selectedAttackerId,
-  onSelectAttacker,
-  onAttackDefender,
-  onConfirmAttack,
-  onAssignDefender,
-  onConfirmDefense,
 }) => {
-  const [focus, setFocus] = useState<BoardFocus>('balanced');
-  const focusRef = useRef<BoardFocus>('balanced');
+  // ── Store actions ───────────────────────────────────────────────────────────
+  const attacks = useGameStore(s => s.state.combat.attacks);
+  const blocks = useGameStore(s => s.state.combat.blocks);
+  const declareAttack = useGameStore(s => s.declareAttack);
+  const cancelAttack = useGameStore(s => s.cancelAttack);
+  const declareBlock = useGameStore(s => s.declareBlock);
+  const cancelBlock = useGameStore(s => s.cancelBlock);
 
-  const opponentFlex = useRef(new Animated.Value(FOCUS_RATIOS.balanced.opponent)).current;
-  const playerFlex   = useRef(new Animated.Value(FOCUS_RATIOS.balanced.player)).current;
+  // ── Sélection UI locale ─────────────────────────────────────────────────────
+  // Séparée du store : c'est de l'UI temporaire avant confirmation
+  const [selectedBlockerId, setSelectedBlockerId] = useState<string | null>(null);
 
-  const snapToFocus = (newFocus: BoardFocus) => {
-    focusRef.current = newFocus;
-    setFocus(newFocus);
-    const ratios = FOCUS_RATIOS[newFocus];
-    Animated.spring(opponentFlex, {
-      toValue: ratios.opponent,
-      useNativeDriver: false,
-      tension: 80,
-      friction: 10,
-    }).start();
-    Animated.spring(playerFlex, {
-      toValue: ratios.player,
-      useNativeDriver: false,
-      tension: 80,
-      friction: 10,
-    }).start();
-  };
-
-  // Auto-snap selon la phase active
   useEffect(() => {
-    const defaultFocus = PHASE_DEFAULT_FOCUS[turnPhase];
-    if (defaultFocus) snapToFocus(defaultFocus);
+    onSelectedAttackerChange(null);
+    setSelectedBlockerId(null);
   }, [turnPhase]);
 
-  // Geste vertical propre avec RNGH v2
-  // activeOffsetY  → s\'active seulement si mouvement vertical > 15px
-  // failOffsetX    → abandonne si mouvement horizontal > 10px (laisse le FlatList scroller)
+  // ── Handlers qui relient UI → store ─────────────────────────────────────────
+
+  const handleDeclareAttack = (attack: CombatAttack) => {
+    declareAttack(attack);
+    onSelectedAttackerChange(null);
+  };
+
+  const handleDeclareBlock = (block: CombatBlock) => {
+    declareBlock(block);
+    setSelectedBlockerId(null);
+  };
+
+  // ── Swipe / focus ───────────────────────────────────────────────────────────
+  const [focus, setFocus] = useState<BoardFocus>('balanced');
+  const focusRef = useRef<BoardFocus>('balanced');
+  const player2Flex = useRef(new Animated.Value(0.40)).current;
+  const player1Flex = useRef(new Animated.Value(0.60)).current;
+
+  const snapToFocus = (f: BoardFocus) => {
+    focusRef.current = f;
+    setFocus(f);
+    const r = FOCUS_RATIOS[f];
+    Animated.spring(player2Flex, { toValue: r.player2, useNativeDriver: false, tension: 80, friction: 10 }).start();
+    Animated.spring(player1Flex, { toValue: r.player1, useNativeDriver: false, tension: 80, friction: 10 }).start();
+  };
+
   const swipeGesture = Gesture.Pan()
     .activeOffsetY([-15, 15])
     .failOffsetX([-10, 10])
     .runOnJS(true)
-    .onEnd((event) => {
-      const current = focusRef.current;
-      const swipedUp   = event.translationY < -30 || event.velocityY < -400;
-      const swipedDown = event.translationY > 30  || event.velocityY > 400;
-
-      if (swipedUp) {
-        if (current === 'player')        snapToFocus('balanced');
-        else if (current === 'balanced') snapToFocus('opponent');
-      } else if (swipedDown) {
-        if (current === 'opponent')      snapToFocus('balanced');
-        else if (current === 'balanced') snapToFocus('player');
-      }
+    .onEnd(e => {
+      const up = e.translationY < -30 || e.velocityY < -400;
+      const down = e.translationY > 30 || e.velocityY > 400;
+      const cur = focusRef.current;
+      if (up) snapToFocus(cur === 'player1' ? 'balanced' : 'player2');
+      if (down) snapToFocus(cur === 'player2' ? 'balanced' : 'player1');
     });
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <GestureDetector gesture={swipeGesture}>
-      <View style={styles.container}>
+      <View style={{ flex: 1 }}>
         <Board
-          player={player}
-          opponent={opponent}
-          isCurrentPlayer={isCurrentPlayer}
+          player1={player1}
+          player2={player2}
+          currentPlayerIndex={currentPlayerIndex}
           turnPhase={turnPhase}
+          attacks={attacks}
+          blocks={blocks}
           selectedAttackerId={selectedAttackerId}
-          onSelectAttacker={onSelectAttacker}
-          onAttackDefender={onAttackDefender}
-          onConfirmAttack={onConfirmAttack}
-          onAssignDefender={onAssignDefender}
-          onConfirmDefense={onConfirmDefense}
-          opponentFlex={opponentFlex}
-          playerFlex={playerFlex}
+          selectedBlockerId={selectedBlockerId}
+          onSelectAttacker={onSelectedAttackerChange}
+          onSelectBlocker={setSelectedBlockerId}
+          onDeclareAttack={handleDeclareAttack}
+          onCancelAttack={cancelAttack}
+          onDeclareBlock={handleDeclareBlock}
+          onCancelBlock={cancelBlock}
+          player2Flex={player2Flex}
+          player1Flex={player1Flex}
         />
-
-        {/* 3 points indicateurs de focus */}
+        {/* Indicateurs de focus */}
         <View style={styles.focusIndicators} pointerEvents="none">
-          {(['opponent', 'balanced', 'player'] as BoardFocus[]).map((state) => (
-            <View
-              key={state}
-              style={[styles.focusDot, focus === state && styles.focusDotActive]}
-            />
+          {(['player2', 'balanced', 'player1'] as BoardFocus[]).map(s => (
+            <View key={s} style={[styles.focusDot, focus === s && styles.focusDotActive]} />
           ))}
         </View>
       </View>
@@ -132,27 +116,7 @@ export const BoardContainer: React.FC<BoardContainerProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  focusIndicators: {
-    position: 'absolute',
-    right: 8,
-    top: '50%',
-    transform: [{ translateY: -24 }],
-    alignItems: 'center',
-    gap: 6,
-  },
-  focusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  focusDotActive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#d4af37',
-  },
+  focusIndicators: { position: 'absolute' as const, right: 8, top: '50%', transform: [{ translateY: -28 }], gap: 6, alignItems: 'center' as const },
+  focusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.15)' },
+  focusDotActive: { backgroundColor: '#d4af37', width: 8, height: 8, borderRadius: 4 },
 });

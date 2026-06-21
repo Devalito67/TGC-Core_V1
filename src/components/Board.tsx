@@ -1,29 +1,33 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Animated,
+  View, Text, TouchableOpacity, Alert, Animated,
+  StyleSheet
 } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import { CardComponent } from './Card';
-import { Card, Player, TurnPhase } from '../types';
+import { Card, CombatAttack, CombatBlock, Player, TurnPhase } from '../types';
 
 interface BoardProps {
-  player: Player;
-  opponent: Player;
-  isCurrentPlayer: boolean;
+  player1: Player;
+  player2: Player;
+  currentPlayerIndex: 0 | 1;
   turnPhase: TurnPhase;
+  // Combat state venant du store via BoardContainer
+  attacks: CombatAttack[];
+  blocks: CombatBlock[];
+  // Sélection locale UI (géré dans Board)
   selectedAttackerId: string | null;
-  onSelectAttacker: (attackerId: string | null) => void;
-  onAttackDefender: (targetType: 'hero' | 'unit', targetId?: string) => void;
-  onConfirmAttack: () => void;
-  onAssignDefender: (attackerId: string, blockerId: string) => void;
-  onConfirmDefense: () => void;
-  opponentFlex: Animated.Value;
-  playerFlex: Animated.Value;
+  selectedBlockerId: string | null;
+  onSelectAttacker: (id: string | null) => void;
+  onSelectBlocker: (id: string | null) => void;
+  // Callbacks vers le store
+  onDeclareAttack: (attack: CombatAttack) => void;
+  onCancelAttack: (attackerId: string) => void;
+  onDeclareBlock: (block: CombatBlock) => void;
+  onCancelBlock: (blockerId: string) => void;
+  // Flex animé pour le swipe
+  player2Flex: Animated.Value;
+  player1Flex: Animated.Value;
 }
 
 const PHASES: { key: TurnPhase; label: string }[] = [
@@ -35,164 +39,225 @@ const PHASES: { key: TurnPhase; label: string }[] = [
 ];
 
 export const Board: React.FC<BoardProps> = ({
-  player,
-  opponent,
-  isCurrentPlayer,
-  turnPhase,
-  selectedAttackerId,
-  onSelectAttacker,
-  onAttackDefender,
-  onConfirmAttack,
-  onAssignDefender,
-  onConfirmDefense,
-  opponentFlex,
-  playerFlex,
+  player1, player2, currentPlayerIndex, turnPhase,
+  attacks, blocks,
+  selectedAttackerId, selectedBlockerId,
+  onSelectAttacker, onSelectBlocker,
+  onDeclareAttack, onCancelAttack, onDeclareBlock,
+  onCancelBlock, player2Flex, player1Flex,
 }) => {
-  const handleSelectAttacker = (cardId: string) => {
-    if (!isCurrentPlayer) return;
-    if (turnPhase !== 'attack') {
-      Alert.alert('⚔️', "Tu ne peux attaquer que pendant la phase Attack !");
+  // ── Qui attaque / défend ce tour ───────────────────────────────────────────
+  const attackingPlayer = currentPlayerIndex === 0 ? player1 : player2;
+  const defendingPlayer = currentPlayerIndex === 0 ? player2 : player1;
+
+  // ── Helpers inchangés ──────────────────────────────────────────────────────
+  const getAttackByAttacker = (id: string) => attacks.find(a => a.attackerId === id);
+  const getBlockByBlocker = (id: string) => blocks.find(b => b.blockerId === id);
+  const getBlockByAttacker = (id: string) => blocks.find(b => b.attackerId === id);
+  const attacksOnHero = attacks.filter(a => a.targetType === 'hero');
+
+  // ── Tap sur une carte de player1 (toujours en bas) ─────────────────────────
+  const handleTapPlayer1Card = (card: Card) => {
+    if (turnPhase === 'attack' && currentPlayerIndex === 0) {
+      handleTapAttacker(card);
       return;
     }
-    onSelectAttacker(selectedAttackerId === cardId ? null : cardId);
+    if (turnPhase === 'defense' && currentPlayerIndex === 1) {
+      // player2 attaque → player1 défend → sélection bloqueur
+      handleTapBlocker(card);
+      return;
+    }
+    if (turnPhase === 'defense' && currentPlayerIndex === 0) {
+      // player1 attaque → player1 est l'attaquant → taper sa carte assigne le blocage
+      handleTapTarget(card);
+      return;
+    }
+    // Phase attack : carte adverse = cible
+    handleTapTarget(card);
   };
 
-  const handleSelectTargetOnUnit = (targetId: string) => {
-    if (!selectedAttackerId || turnPhase !== 'attack') return;
-    onAttackDefender('unit', targetId);
-    onSelectAttacker(null);
+  // ── Tap sur une carte de player2 (toujours en haut) ────────────────────────
+  const handleTapPlayer2Card = (card: Card) => {
+    if (turnPhase === 'attack' && currentPlayerIndex === 1) {
+      handleTapAttacker(card);
+      return;
+    }
+    if (turnPhase === 'defense' && currentPlayerIndex === 0) {
+      // player1 attaque → player2 défend → sélection bloqueur
+      handleTapBlocker(card);
+      return;
+    }
+    if (turnPhase === 'defense' && currentPlayerIndex === 1) {
+      // player2 attaque → player2 est l'attaquant → taper sa carte assigne le blocage
+      handleTapTarget(card);
+      return;
+    }
+    // Phase attack : carte adverse = cible
+    handleTapTarget(card);
+  };
+  // ── Logique attaquant ───────────────────────────────────────────────────────
+  const handleTapAttacker = (card: Card) => {
+    if (card.summoningSickness) {
+      Alert.alert('⏳', "Cette carte vient d'être invoquée !");
+      return;
+    }
+    if (card.tapped) {
+      Alert.alert('⚔️', "Cette carte a déjà attaqué ce tour !");
+      return;
+    }
+    if (selectedAttackerId === card.id) {
+      onSelectAttacker(null);
+      if (getAttackByAttacker(card.id)) onCancelAttack(card.id);
+      return;
+    }
+    onSelectAttacker(card.id);
   };
 
-  const renderOpponentCard = ({ item: card }: { item: Card }) => (
-    <TouchableOpacity
-      onPress={() => handleSelectTargetOnUnit(card.id)}
-      style={[styles.cardSlot, !!selectedAttackerId && styles.cardSlotTargetable]}
-    >
-      <CardComponent card={card} size="small" />
-    </TouchableOpacity>
-  );
+  // ── Logique bloqueur ────────────────────────────────────────────────────────
+  const handleTapBlocker = (card: Card) => {
+    const alreadyBlocking = getBlockByBlocker(card.id);
+    if (alreadyBlocking) { onCancelBlock(card.id); return; }
+    if (selectedBlockerId === card.id) { onSelectBlocker(null); return; }
+    onSelectBlocker(card.id);
+  };
 
-  const renderPlayerCard = ({ item: card }: { item: Card }) => (
-    <TouchableOpacity
-      onPress={() => {
-        if (card.summoningSickness) {
-          Alert.alert('⏳', "Cette carte vient d\'être invoquée, elle ne peut pas encore attaquer !");
-          return;
-        }
-        handleSelectAttacker(card.id);
-      }}
-      style={[
-        styles.cardSlot,
-        turnPhase !== 'attack' && { opacity: 0.5 },
-        card.summoningSickness && styles.cardSlotSick,
-        selectedAttackerId === card.id && styles.cardSlotSelected,
-      ]}
-    >
-      <CardComponent card={card} size="small" />
-      {card.summoningSickness && (
-        <View style={styles.sicknessBadge}>
-          <Text style={styles.sicknessEmoji}>⏳</Text>
-        </View>
-      )}
-      {selectedAttackerId === card.id && (
-        <View style={styles.attackerBadge}>
-          <Text style={styles.attackerEmoji}>⚔️</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  // ── Logique cible adverse ───────────────────────────────────────────────────
+  const handleTapTarget = (card: Card) => {
+    if (turnPhase === 'attack' && selectedAttackerId) {
+      onDeclareAttack({ attackerId: selectedAttackerId, targetType: 'unit', targetId: card.id });
+      onSelectAttacker(null);
+      return;
+    }
+    if (turnPhase === 'defense' && selectedBlockerId) {
+      const isAttackingHero = attacks.some(
+        a => a.attackerId === card.id && a.targetType === 'hero'
+      );
+      if (!isAttackingHero) {
+        Alert.alert('🛡️', "Cette carte n'attaque pas le héros !");
+        return;
+      }
+      onDeclareBlock({ attackerId: card.id, blockerId: selectedBlockerId });
+      onSelectBlocker(null);
+    }
+  };
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+  const renderCard = (card: Card, onTap: (card: Card) => void) => {
+    const attack = getAttackByAttacker(card.id);
+    const blocking = getBlockByBlocker(card.id);
+    const isAttacker = attacks.some(a => a.attackerId === card.id);
+    const attackerAttack = attacks.find(a => a.attackerId === card.id);
+    const isTargetedByAttack = attacks.some(a => a.targetId === card.id);
+    const blocked = getBlockByAttacker(card.id);
+    const isSelAttacker = selectedAttackerId === card.id;
+    const isSelBlocker = selectedBlockerId === card.id;
+    const isTargetable =
+      (turnPhase === 'attack' && !!selectedAttackerId) ||
+      (turnPhase === 'defense' && !!selectedBlockerId &&
+        attacks.some(a => a.attackerId === card.id && a.targetType === 'hero'));
+
+    return (
+      <TouchableOpacity
+        key={card.id}
+        onPress={() => onTap(card)}
+        style={[
+          styles.cardSlot,
+          card.tapped && styles.tapped,
+          isAttacker && styles.tapped,       // attaquant déclaré = visuellement tapped
+          card.summoningSickness && styles.sick,
+          isSelAttacker && styles.selected,
+          isSelBlocker && styles.selectedBlocker,
+          !!attack && styles.declared,
+          !!blocking && styles.blocking,
+          isTargetable && styles.targetable,
+          isTargetedByAttack && styles.targeted,
+          !!blocked && styles.blocked,
+        ]}
+      >
+        <CardComponent card={card} size="small" />
+        {card.summoningSickness && <View style={styles.badge}><Text style={styles.badgeText}>⏳</Text></View>}
+        {!!attack && <View style={styles.badge}><Text style={styles.badgeText}>{attack.targetType === 'hero' ? '💥' : '⚔️'}</Text></View>}
+        {isAttacker && !attack && <View style={styles.badge}><Text style={styles.badgeText}>{attackerAttack?.targetType === 'hero' ? '💥' : '⚔️'}</Text></View>}
+        {isSelAttacker && !attack && <View style={styles.badge}><Text style={styles.badgeText}>⚔️</Text></View>}
+        {isSelBlocker && <View style={styles.badge}><Text style={styles.badgeText}>🛡️</Text></View>}
+        {!!blocking && !isSelBlocker && <View style={styles.badge}><Text style={styles.badgeText}>🛡️</Text></View>}
+        {isTargetedByAttack && !blocked && <View style={styles.badge}><Text style={styles.badgeText}>⚔️</Text></View>}
+        {!!blocked && <View style={styles.badge}><Text style={styles.badgeText}>🛡️</Text></View>}
+      </TouchableOpacity>
+    );
+  };
   return (
     <View style={styles.container}>
 
-      {/* Plateau adverse — flex animé */}
-      <Animated.View style={[styles.boardZone, { flex: opponentFlex }]}>
-        {opponent.board.length === 0 ? (
-          <View style={styles.emptyZone}>
-            <Text style={styles.emptyText}>Empty Battlefield</Text>
-          </View>
+      {/* Plateau adverse */}
+      <Animated.View style={[styles.boardZone, { flex: player2Flex }]}>
+        {player2.board.length === 0 ? (
+          <View style={styles.empty}><Text style={styles.emptyText}>Empty Battlefield</Text></View>
         ) : (
           <FlatList
             horizontal
-            data={opponent.board}
-            keyExtractor={(card) => card.id}
-            renderItem={renderOpponentCard}
-            contentContainerStyle={styles.cardsScroll}
+            data={player2.board}
+            keyExtractor={c => c.id}
+            renderItem={({ item: card }) => renderCard(card, handleTapPlayer2Card)}
+            contentContainerStyle={styles.scroll}
             showsHorizontalScrollIndicator={false}
           />
         )}
       </Animated.View>
 
       {/* Barre de phases */}
-      <View style={styles.phaseDivider}>
-        {PHASES.map((phase, index) => {
-          const isActive = turnPhase === phase.key;
-          return (
-            <React.Fragment key={phase.key}>
-              <View style={styles.phaseStepWrapper}>
-                <View style={[styles.phaseStep, isActive && styles.phaseStepActive]}>
-                  <Text style={[styles.phaseStepText, isActive && styles.phaseStepTextActive]}>
-                    {phase.label}
-                  </Text>
-                </View>
-              </View>
-              {index < PHASES.length - 1 && (
-                <View style={[styles.phaseConnector, isActive && styles.phaseConnectorActive]} />
-              )}
-            </React.Fragment>
-          );
-        })}
+      <View style={styles.phaseBar}>
+        {PHASES.map((p, i) => (
+          <React.Fragment key={p.key}>
+            <View style={[styles.phaseStep, turnPhase === p.key && styles.phaseStepActive]}>
+              <Text style={[styles.phaseText, turnPhase === p.key && styles.phaseTextActive]}>
+                {p.label}
+              </Text>
+            </View>
+            {i < PHASES.length - 1 && (
+              <View style={[styles.phaseConnector, turnPhase === p.key && styles.phaseConnectorActive]} />
+            )}
+          </React.Fragment>
+        ))}
       </View>
 
       {/* Hint défense */}
-      {turnPhase === 'defense' && (
-        <View style={styles.defenseHintContainer} pointerEvents="none">
-          <Text style={styles.defenseHintText}>
-            Swipe ↑↓ pour changer la vue • Sélectionne un défenseur
+      {turnPhase === 'defense' && attacksOnHero.length > 0 && (
+        <View style={styles.hint} pointerEvents="none">
+          <Text style={styles.hintText}>
+            {attacksOnHero.length} attaque(s) vers le héros
+            {selectedBlockerId ? ' — Tape un attaquant adverse pour bloquer' : ' — Sélectionne un défenseur'}
           </Text>
         </View>
       )}
 
-      {/* Plateau joueur — flex animé */}
-      <Animated.View style={[styles.boardZone, { flex: playerFlex }]}>
-        {player.board.length === 0 ? (
-          <View style={styles.emptyZone}>
-            <Text style={styles.emptyText}>Deploy cards to the Rift</Text>
-          </View>
+      {/* Plateau joueur */}
+      <Animated.View style={[styles.boardZone, { flex: player1Flex }]}>
+        {player1.board.length === 0 ? (
+          <View style={styles.empty}><Text style={styles.emptyText}>Deploy cards to the Rift</Text></View>
         ) : (
           <FlatList
             horizontal
-            data={player.board}
-            keyExtractor={(card) => card.id}
-            renderItem={renderPlayerCard}
-            contentContainerStyle={styles.cardsScroll}
+            data={player1.board}
+            keyExtractor={c => c.id}
+            renderItem={({ item: card }) => renderCard(card, handleTapPlayer1Card)}
+            contentContainerStyle={styles.scroll}
             showsHorizontalScrollIndicator={false}
           />
         )}
       </Animated.View>
 
-      {/* Overlay hint attaque */}
+      {/* Overlay hint attack */}
       {selectedAttackerId && turnPhase === 'attack' && (
-        <View style={styles.actionOverlay} pointerEvents="none">
-          <Text style={styles.actionOverlayText}>
-            Sélectionne une cible ou appuie sur le héros adverse
-          </Text>
+        <View style={styles.overlay} pointerEvents="none">
+          <Text style={styles.overlayText}>Sélectionne une cible ou tape le héros adverse</Text>
         </View>
       )}
 
-      {turnPhase === 'attack' && (
-        <View style={styles.confirmButtonContainer}>
-          <TouchableOpacity style={styles.confirmButton} onPress={onConfirmAttack}>
-            <Text style={styles.confirmButtonText}>Confirmer Attack ⚔️</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {turnPhase === 'defense' && (
-        <View style={styles.confirmButtonContainer}>
-          <TouchableOpacity style={styles.confirmButton} onPress={onConfirmDefense}>
-            <Text style={styles.confirmButtonText}>Confirmer Defense 🛡️</Text>
-          </TouchableOpacity>
+      {/* Résumé attaques déclarées */}
+      {turnPhase === 'attack' && attacks.length > 0 && !selectedAttackerId && (
+        <View style={styles.overlay} pointerEvents="none">
+          <Text style={styles.overlayText}>{attacks.length} attaque(s) déclarée(s) — Confirme ou continue</Text>
         </View>
       )}
     </View>
@@ -200,170 +265,36 @@ export const Board: React.FC<BoardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0c0e11',
-    paddingTop: 10,
-    paddingHorizontal: 10,
-  },
-  boardZone: {
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  emptyZone: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardsScroll: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  cardSlot: {
-    padding: 2,
-    borderRadius: 6,
-  },
-  cardSlotSelected: {
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    shadowColor: '#d4af37',
-    shadowRadius: 15,
-    shadowOpacity: 0.8,
-    elevation: 10,
-    transform: [{ scale: 1.1 }],
-  },
-  cardSlotTargetable: {
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-    shadowColor: '#FF6B6B',
-    shadowRadius: 10,
-    shadowOpacity: 0.6,
-  },
-  cardSlotSick: {
-    opacity: 0.4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  attackerBadge: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
-    backgroundColor: '#d4af37',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  attackerEmoji: { fontSize: 12 },
-  sicknessBadge: {
-    position: 'absolute',
-    top: -10,
-    left: -10,
-    backgroundColor: '#1a1c1f',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sicknessEmoji: { fontSize: 12 },
-  emptyText: {
-    color: 'rgba(255,255,255,0.1)',
-    fontStyle: 'italic',
-    fontSize: 12,
-  },
-  actionOverlay: {
-    position: 'absolute',
-    bottom: 60,
-    left: '15%',
-    right: '15%',
-    backgroundColor: 'rgba(212, 175, 55, 0.9)',
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
-  actionOverlayText: {
-    color: '#111316',
-    fontWeight: 'bold',
-    fontSize: 11,
-  },
-  phaseDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    paddingHorizontal: 8,
-  },
-  phaseStepWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phaseStep: {
-    minWidth: 62,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 55, 0.14)',
-    alignItems: 'center',
-  },
-  phaseStepActive: {
-    backgroundColor: 'rgba(212, 175, 55, 0.18)',
-    borderColor: '#d4af37',
-    shadowColor: '#d4af37',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  phaseStepText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  phaseStepTextActive: {
-    color: '#d4af37',
-    fontWeight: '900',
-  },
-  phaseConnector: {
-    flex: 1,
-    maxWidth: 26,
-    height: 2,
-    marginHorizontal: 4,
-    backgroundColor: 'rgba(212, 175, 55, 0.12)',
-  },
-  phaseConnectorActive: {
-    backgroundColor: 'rgba(212, 175, 55, 0.3)',
-  },
-  defenseHintContainer: {
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  defenseHintText: {
-    color: '#d4af37',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  confirmButtonContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  confirmButton: {
-    backgroundColor: 'rgba(212, 175, 55, 0.2)',
-    borderWidth: 1,
-    borderColor: '#d4af37',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  confirmButtonText: {
-    color: '#d4af37',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, backgroundColor: '#0c0e11' },
+  boardZone: { justifyContent: 'center' as const },
+  scroll: { alignItems: 'center' as const, gap: 12, paddingHorizontal: 20 },
+  empty: { flex: 1, justifyContent: 'center' as const, alignItems: 'center' as const },
+  emptyText: { color: 'rgba(255,255,255,0.1)', fontStyle: 'italic' as const, fontSize: 12 },
+  cardSlot: { padding: 2, borderRadius: 6 },
+  tapped: { opacity: 0.5, transform: [{ rotate: '15deg' }] },
+  sick: { opacity: 0.45 },
+  selected: { borderWidth: 2, borderColor: '#d4af37', borderRadius: 6, transform: [{ scale: 1.1 }] },
+  selectedBlocker: { borderWidth: 2, borderColor: '#4ECDC4', borderRadius: 6, transform: [{ scale: 1.1 }] },
+  declared: { borderWidth: 2, borderColor: '#FF6B6B', borderRadius: 6 },
+  blocking: { borderWidth: 2, borderColor: '#4ECDC4', borderRadius: 6 },
+  targetable: { borderWidth: 2, borderColor: '#FF6B6B', borderRadius: 6 },
+  targeted: { borderWidth: 2, borderColor: '#FF6B6B', borderRadius: 6, opacity: 0.8 },
+  blocked: { borderWidth: 2, borderColor: '#4ECDC4', borderRadius: 6 },
+  badge: { position: 'absolute' as const, top: -10, right: -10, width: 20, height: 20, borderRadius: 10, backgroundColor: '#1a1c1f', justifyContent: 'center' as const, alignItems: 'center' as const },
+  badgeText: { fontSize: 11 },
+  phaseBar: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, height: 56, paddingHorizontal: 8 },
+  phaseStep: { minWidth: 62, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(212,175,55,0.14)', alignItems: 'center' as const },
+  phaseStepActive: { backgroundColor: 'rgba(212,175,55,0.18)', borderColor: '#d4af37' },
+  phaseText: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700' as const },
+  phaseTextActive: { color: '#d4af37', fontWeight: '900' as const },
+  phaseConnector: { flex: 1, maxWidth: 26, height: 2, marginHorizontal: 4, backgroundColor: 'rgba(212,175,55,0.12)' },
+  phaseConnectorActive: { backgroundColor: 'rgba(212,175,55,0.3)' },
+  hint: { marginVertical: 4, alignItems: 'center' as const },
+  hintText: { color: '#d4af37', fontSize: 11, fontWeight: '600' as const },
+  overlay: { position: 'absolute' as const, top: 50, left: '15%', right: '15%', backgroundColor: 'rgba(212,175,55,0.9)', paddingVertical: 6, borderRadius: 16, alignItems: 'center' as const },
+  overlayText: { color: '#111316', fontWeight: 'bold' as const, fontSize: 11 },
+  confirmRow: { position: 'absolute', bottom: 8, alignSelf: 'center', zIndex: 50 },
+  btn: { backgroundColor: 'rgba(212,175,55,0.2)', borderWidth: 1, borderColor: '#d4af37', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20 },
+  btnEmpty: { opacity: 0.5 },
+  btnText: { color: '#d4af37', fontSize: 12, fontWeight: 'bold' as const },
 });

@@ -14,12 +14,18 @@ onTurnStart: (state: GameState, player: Player): GameState => {
     maxMana: newMaxMana,
     mana: newMaxMana,
     hasPlayedCardThisTurn: false,
-    board: player.board.map(c => ({ ...c, summoningSickness: false })), // ← fusionné ici
+    board: player.board.map(c => ({
+      ...c,
+      summoningSickness: false,
+      tapped: false,
+      defense: c.defense,  // ← régénération complète des PV
+      attack: c.attack,
+    })),
   };
 
   return {
     ...state,
-    players: newPlayers, // ← un seul players
+    players: newPlayers,
     logs: [...state.logs, `🔄 Tour ${state.turn} — ${newPlayers[idx].name} | 💧 ${newMaxMana}/${newMaxMana}`],
   };
 },
@@ -46,7 +52,7 @@ onTurnStart: (state: GameState, player: Player): GameState => {
       return { ...state, logs: [...state.logs, `❌ Impossible de jouer ${card.name}`] };
     }
 
-    const cardToBoard: Card = { ...card, summoningSickness: true, };
+    const cardToBoard: Card = { ...card, summoningSickness: true, tapped:false};
     const idx = state.players.findIndex(p => p.id === player.id) as 0 | 1;
     const newPlayers = [...state.players] as [Player, Player];
     newPlayers[idx] = {
@@ -63,12 +69,12 @@ onTurnStart: (state: GameState, player: Player): GameState => {
       }
       newPlayers[idx] = {
         ...newPlayers[idx],
-        board: [...newPlayers[idx].board, { ...cardToBoard, health: card.maxHealth }],
+        board: [...newPlayers[idx].board, { ...cardToBoard, defense: card.defense }],
       };
       return {
         ...newState,
         players: [...newPlayers] as [Player, Player],
-        logs: [...state.logs, `🧙 ${player.name} invoque ${card.name} (${card.attack}⚔️ ${card.health}❤️)`],
+        logs: [...state.logs, `🧙 ${player.name} invoque ${card.name} (${card.attack}⚔️ ${card.defense}❤️)`],
       };
     }
 
@@ -130,7 +136,7 @@ onTurnStart: (state: GameState, player: Player): GameState => {
   // Calcule les dégâts d'une attaque
   calculateAttack: (attacker: Card, defender: Card): { damage: number; dead: boolean } => {
     const damage = attacker.attack;
-    return { damage, dead: defender.health <= damage };
+    return { damage, dead: defender.defense <= damage };
   },
 
   // Vérifie la condition de victoire

@@ -29,23 +29,25 @@ const makeCard = (
   name: string,
   cost: number,
   attack: number,
-  health: number,
+  defense: number,
   type: 'minion' | 'spell' | 'weapon',
   element: 'fire' | 'water' | 'earth' | 'air' | 'shadow' | 'light',
   rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common',
-  description?: string
+  description?: string,
+  
 ): Card => ({
   id: generateId(),
   name,
   description,
   cost,
   attack,
-  health,
-  maxHealth: health,
+  defense,
   type,
   element,
   rarity,
   version: '1.0',
+  summoningSickness: true,
+  tapped: false,     
 });
 
 const buildDefaultCards = (): Card[] => [
